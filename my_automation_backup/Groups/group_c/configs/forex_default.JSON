@@ -1,0 +1,12 @@
+{
+  "market": "Forex",
+  "description": "Default config for Forex pairs",
+  "weights_z": {"trend": 0.35, "volume": 0.15, "momentum": 0.30},
+  "weights_a": {"structure": 0.25, "indicators": 0.30, "sr": 0.25, "candle": 0.20},
+  "thresholds_z": {"strong_buy": 75, "buy": 60, "wait": 45, "sell": 40, "strong_sell": 25},
+  "thresholds_a": {"strong": 80, "go": 65, "caution": 55, "block": 50},
+  "min_z_for_a": 55,
+  "min_a_score": 65,
+  "risk": {"sl_atr": 1.5, "tp_atr": 2.5, "max_risk_percent": 2.0},
+  "indicators": {"rsi_oversold": 35, "rsi_overbought": 65, "ema_fast": 10, "ema_slow": 20}
+}
