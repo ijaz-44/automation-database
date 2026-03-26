@@ -1,0 +1,12 @@
+{
+  "market": "Binary OTC",
+  "description": "Default config for Binary OTC pairs",
+  "weights_z": {"trend": 0.40, "volume": 0.05, "momentum": 0.35},
+  "weights_a": {"structure": 0.25, "indicators": 0.30, "sr": 0.25, "candle": 0.20},
+  "thresholds_z": {"strong_buy": 78, "buy": 65, "wait": 50, "sell": 45, "strong_sell": 30},
+  "thresholds_a": {"strong": 82, "go": 68, "caution": 55, "block": 50},
+  "min_z_for_a": 55,
+  "min_a_score": 65,
+  "risk": {"sl_atr": 1.0, "tp_atr": 1.5, "max_risk_percent": 1.5},
+  "indicators": {"rsi_oversold": 40, "rsi_overbought": 60, "ema_fast": 5, "ema_slow": 10}
+}
