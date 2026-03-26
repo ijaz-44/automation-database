@@ -1,0 +1,16 @@
+{
+  "symbol":       "",
+  "market":       "",
+  "interval":     "",
+  "ts":           0,
+  "z_score":      0,
+  "a_score":      0,
+  "detail_score": 0,
+  "final_signal": "",
+  "confidence":   0,
+  "sl":           0,
+  "tp":           0,
+  "reason":       "",
+  "forecast":     {},
+  "details":      {}
+}
