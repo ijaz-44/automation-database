@@ -1,0 +1,12 @@
+{
+  "market": "Crypto",
+  "description": "Default config for Crypto pairs",
+  "weights_z": {"trend": 0.30, "volume": 0.20, "momentum": 0.30},
+  "weights_a": {"structure": 0.30, "indicators": 0.35, "sr": 0.20, "candle": 0.15},
+  "thresholds_z": {"strong_buy": 72, "buy": 58, "wait": 42, "sell": 38, "strong_sell": 22},
+  "thresholds_a": {"strong": 78, "go": 62, "caution": 52, "block": 48},
+  "min_z_for_a": 52,
+  "min_a_score": 62,
+  "risk": {"sl_atr": 2.0, "tp_atr": 3.5, "max_risk_percent": 3.0},
+  "indicators": {"rsi_oversold": 30, "rsi_overbought": 70, "ema_fast": 10, "ema_slow": 20}
+}
