@@ -2,7 +2,7 @@
 import os, sys, time
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from data_manager import get_rows
+from data_manager import get_rows, stage_d, stage_z, stage_a
 
 def get_table(symbol, market, interval):
     """Final trade judge - Layer 3 confirmation"""
