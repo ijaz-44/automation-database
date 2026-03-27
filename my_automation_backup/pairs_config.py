@@ -1,4 +1,4 @@
-# pairs_config.py - Updated with 4 categories (Real Currency, Crypto, Commodity, Stock)
+# pairs_config.py - Updated with 4 markets (Binary OTC, CFD, Spot, Future)
 import json
 import os
 
@@ -41,73 +41,55 @@ def get_all_pairs():
         pairs = config.get(category, [])
         if pairs:
             all_pairs.extend(pairs)
-            print(f"[Pairs] Added {len(pairs)} pairs from {category}")
     
-    print(f"[Pairs] Total pairs: {len(all_pairs)}")
     return all_pairs
 
 def get_real_currency_pairs():
-    """Get all real currency (forex) pairs - 70 total (35 corr + 35 uncorr)"""
+    """Get all real currency (forex) pairs - unique only"""
     config = get_pairs_config()
     forex_pairs = []
     
-    for category in ["real_currency_corr", "real_currency_uncorr"]:
-        pairs = config.get(category, [])
-        if pairs:
-            forex_pairs.extend(pairs)
+    # Get unique pairs from both lists
+    corr = set(config.get("real_currency_corr", []))
+    uncorr = set(config.get("real_currency_uncorr", []))
     
-    print(f"[Pairs] Found {len(forex_pairs)} total real currency pairs")
-    print(f"[Pairs] Correlated: {len(config.get('real_currency_corr', []))}")
-    print(f"[Pairs] Uncorrelated: {len(config.get('real_currency_uncorr', []))}")
-    
+    forex_pairs = list(corr | uncorr)
     return forex_pairs
 
 def get_crypto_pairs():
-    """Get all crypto pairs - 50 total (25 corr + 25 uncorr)"""
+    """Get all crypto pairs - unique only"""
     config = get_pairs_config()
     crypto_pairs = []
     
-    for category in ["crypto_corr", "crypto_uncorr"]:
-        pairs = config.get(category, [])
-        if pairs:
-            crypto_pairs.extend(pairs)
+    # Get unique pairs from both lists
+    corr = set(config.get("crypto_corr", []))
+    uncorr = set(config.get("crypto_uncorr", []))
     
-    print(f"[Pairs] Found {len(crypto_pairs)} total crypto pairs")
-    print(f"[Pairs] Correlated: {len(config.get('crypto_corr', []))}")
-    print(f"[Pairs] Uncorrelated: {len(config.get('crypto_uncorr', []))}")
-    
+    crypto_pairs = list(corr | uncorr)
     return crypto_pairs
 
 def get_commodity_pairs():
-    """Get all commodity pairs - 20 total (10 corr + 10 uncorr)"""
+    """Get all commodity pairs - unique only"""
     config = get_pairs_config()
     commodity_pairs = []
     
-    for category in ["commodity_corr", "commodity_uncorr"]:
-        pairs = config.get(category, [])
-        if pairs:
-            commodity_pairs.extend(pairs)
+    # Get unique pairs from both lists
+    corr = set(config.get("commodity_corr", []))
+    uncorr = set(config.get("commodity_uncorr", []))
     
-    print(f"[Pairs] Found {len(commodity_pairs)} total commodity pairs")
-    print(f"[Pairs] Correlated: {len(config.get('commodity_corr', []))}")
-    print(f"[Pairs] Uncorrelated: {len(config.get('commodity_uncorr', []))}")
-    
+    commodity_pairs = list(corr | uncorr)
     return commodity_pairs
 
 def get_stock_pairs():
-    """Get all stock pairs - 20 total (10 corr + 10 uncorr)"""
+    """Get all stock pairs - unique only"""
     config = get_pairs_config()
     stock_pairs = []
     
-    for category in ["stock_corr", "stock_uncorr"]:
-        pairs = config.get(category, [])
-        if pairs:
-            stock_pairs.extend(pairs)
+    # Get unique pairs from both lists
+    corr = set(config.get("stock_corr", []))
+    uncorr = set(config.get("stock_uncorr", []))
     
-    print(f"[Pairs] Found {len(stock_pairs)} total stock pairs")
-    print(f"[Pairs] Correlated: {len(config.get('stock_corr', []))}")
-    print(f"[Pairs] Uncorrelated: {len(config.get('stock_uncorr', []))}")
-    
+    stock_pairs = list(corr | uncorr)
     return stock_pairs
 
 def get_correlation_group(symbol):
@@ -158,46 +140,57 @@ def get_pairs_by_correlation():
     }
 
 def get_pairs_by_market(market_name):
-    """Get pairs by specific market name"""
-    config = get_pairs_config()
+    """Get pairs by specific market name - ALL 139 symbols for each market"""
+    # All 139 unique symbols from all categories
+    all_pairs = []
+    all_pairs.extend(get_real_currency_pairs())
+    all_pairs.extend(get_crypto_pairs())
+    all_pairs.extend(get_commodity_pairs())
+    all_pairs.extend(get_stock_pairs())
     
+    # Remove duplicates
+    all_pairs = list(set(all_pairs))
+    
+    # For all markets, return ALL symbols
+    # Because each market (Binary OTC, CFD, Spot, Future) can trade all these instruments
     market_mapping = {
-        "Real Currency": ["real_currency_corr", "real_currency_uncorr"],
-        "Forex": ["real_currency_corr", "real_currency_uncorr"],
-        "Crypto": ["crypto_corr", "crypto_uncorr"],
-        "Commodities": ["commodity_corr", "commodity_uncorr"],
-        "Stocks": ["stock_corr", "stock_uncorr"],
-        "Indices": [],
-        "Binary OTC": ["real_currency_corr", "real_currency_uncorr"],
-        "Binary Digital": ["crypto_corr", "crypto_uncorr"],
+        "Real Currency": all_pairs,
+        "Forex": all_pairs,
+        "Crypto": get_crypto_pairs(),
+        "Commodities": get_commodity_pairs(),
+        "Stocks": get_stock_pairs(),
+        "Binary OTC": all_pairs,
+        "Binary Digital": get_crypto_pairs(),
+        "CFD": all_pairs,
+        "Spot": all_pairs,
+        "Future": all_pairs,
     }
     
-    categories = market_mapping.get(market_name, [])
-    pairs = []
+    pairs = market_mapping.get(market_name, [])
     
-    for category in categories:
-        category_pairs = config.get(category, [])
-        if category_pairs:
-            pairs.extend(category_pairs)
+    # For backwards compatibility with existing code
+    if market_name == "Binary OTC":
+        print(f"[Pairs] Binary OTC pairs: {len(pairs)}")
+    elif market_name == "CFD":
+        print(f"[Pairs] CFD pairs: {len(pairs)}")
+    elif market_name == "Spot":
+        print(f"[Pairs] Spot pairs: {len(pairs)}")
+    elif market_name == "Future":
+        print(f"[Pairs] Future pairs: {len(pairs)}")
     
     return pairs
 
 def get_ws_pairs():
     """Get WebSocket pairs - ALL pairs for WebSocket connection"""
-    # Get all pairs from all 4 categories for WebSocket
+    # Get all unique pairs from all 4 categories
     all_pairs = []
-    
-    # Real Currency (Forex) - 70 pairs
     all_pairs.extend(get_real_currency_pairs())
-    
-    # Crypto - 50 pairs
     all_pairs.extend(get_crypto_pairs())
-    
-    # Commodity - 20 pairs
     all_pairs.extend(get_commodity_pairs())
-    
-    # Stock - 20 pairs
     all_pairs.extend(get_stock_pairs())
+    
+    # Remove duplicates
+    all_pairs = list(set(all_pairs))
     
     # Convert to lowercase for WebSocket format
     ws_pairs = []
