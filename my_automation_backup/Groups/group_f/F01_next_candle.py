@@ -4,7 +4,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 
 # Fixed import - use data_manager instead of fetcher
 try:
-    from data_manager import get_rows
+    from data_manager import get_rows, stage_d, stage_z, stage_a
 except ImportError:
     # Fallback if data_manager not available
     def get_rows(*args, **kwargs):
