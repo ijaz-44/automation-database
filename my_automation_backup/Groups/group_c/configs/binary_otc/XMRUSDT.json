@@ -1,0 +1,290 @@
+{
+  "timeframes": {
+    "1m": {
+      "weights_z": {
+        "trend": 0.15,
+        "volume": 0.2,
+        "momentum": 0.65
+      },
+      "thresholds_z": {
+        "buy": 67,
+        "sell": 28,
+        "strong_buy": 84,
+        "strong_sell": 12
+      },
+      "weights_a": {
+        "structure": 0.15,
+        "indicators": 0.2,
+        "sr": 0.2,
+        "candle": 0.45
+      },
+      "thresholds_a": {
+        "go": 74,
+        "strong_buy": 85,
+        "strong_sell": 10
+      },
+      "min_a_score": 80,
+      "risk": {
+        "sl_atr_mult": 1.0,
+        "tp_atr_mult": 1.2
+      },
+      "binary_otc": {
+        "expiry_mode": "next_candle",
+        "min_confidence": 78,
+        "allowed_signals": [
+          "BUY",
+          "SELL"
+        ]
+      },
+      "deep": {
+        "min_deep_score": 75,
+        "require_deep_confirm": true
+      },
+      "manipulation": {
+        "enabled": true,
+        "penalty": -35,
+        "min_wick_ratio": 0.6,
+        "volume_spike_threshold": 3.0,
+        "false_breakout_tolerance": 0.3
+      }
+    },
+    "2m": {
+      "weights_z": {
+        "trend": 0.15,
+        "volume": 0.2,
+        "momentum": 0.65
+      },
+      "thresholds_z": {
+        "buy": 67,
+        "sell": 28,
+        "strong_buy": 84,
+        "strong_sell": 12
+      },
+      "weights_a": {
+        "structure": 0.15,
+        "indicators": 0.2,
+        "sr": 0.2,
+        "candle": 0.45
+      },
+      "thresholds_a": {
+        "go": 74,
+        "strong_buy": 85,
+        "strong_sell": 10
+      },
+      "min_a_score": 78,
+      "risk": {
+        "sl_atr_mult": 1.1,
+        "tp_atr_mult": 1.4
+      },
+      "binary_otc": {
+        "expiry_mode": "next_candle",
+        "min_confidence": 78,
+        "allowed_signals": [
+          "BUY",
+          "SELL"
+        ]
+      },
+      "deep": {
+        "min_deep_score": 75,
+        "require_deep_confirm": true
+      },
+      "manipulation": {
+        "enabled": true,
+        "penalty": -35,
+        "min_wick_ratio": 0.6,
+        "volume_spike_threshold": 3.0,
+        "false_breakout_tolerance": 0.35
+      }
+    },
+    "5m": {
+      "weights_z": {
+        "trend": 0.15,
+        "volume": 0.2,
+        "momentum": 0.65
+      },
+      "thresholds_z": {
+        "buy": 67,
+        "sell": 28,
+        "strong_buy": 84,
+        "strong_sell": 12
+      },
+      "weights_a": {
+        "structure": 0.15,
+        "indicators": 0.2,
+        "sr": 0.2,
+        "candle": 0.45
+      },
+      "thresholds_a": {
+        "go": 74,
+        "strong_buy": 85,
+        "strong_sell": 10
+      },
+      "min_a_score": 75,
+      "risk": {
+        "sl_atr_mult": 1.3,
+        "tp_atr_mult": 1.8
+      },
+      "binary_otc": {
+        "expiry_mode": "next_candle",
+        "min_confidence": 78,
+        "allowed_signals": [
+          "BUY",
+          "SELL"
+        ]
+      },
+      "deep": {
+        "min_deep_score": 75,
+        "require_deep_confirm": true
+      },
+      "manipulation": {
+        "enabled": true,
+        "penalty": -35,
+        "min_wick_ratio": 0.6,
+        "volume_spike_threshold": 3.0,
+        "false_breakout_tolerance": 0.4
+      }
+    },
+    "10m": {
+      "weights_z": {
+        "trend": 0.15,
+        "volume": 0.2,
+        "momentum": 0.65
+      },
+      "thresholds_z": {
+        "buy": 67,
+        "sell": 28,
+        "strong_buy": 84,
+        "strong_sell": 12
+      },
+      "weights_a": {
+        "structure": 0.15,
+        "indicators": 0.2,
+        "sr": 0.2,
+        "candle": 0.45
+      },
+      "thresholds_a": {
+        "go": 74,
+        "strong_buy": 85,
+        "strong_sell": 10
+      },
+      "min_a_score": 72,
+      "risk": {
+        "sl_atr_mult": 1.5,
+        "tp_atr_mult": 2.0
+      },
+      "binary_otc": {
+        "expiry_mode": "next_candle",
+        "min_confidence": 78,
+        "allowed_signals": [
+          "BUY",
+          "SELL"
+        ]
+      },
+      "deep": {
+        "min_deep_score": 75,
+        "require_deep_confirm": true
+      },
+      "manipulation": {
+        "enabled": true,
+        "penalty": -35,
+        "min_wick_ratio": 0.6,
+        "volume_spike_threshold": 3.0,
+        "false_breakout_tolerance": 0.45
+      }
+    },
+    "15m": {
+      "weights_z": {
+        "trend": 0.15,
+        "volume": 0.2,
+        "momentum": 0.65
+      },
+      "thresholds_z": {
+        "buy": 67,
+        "sell": 28,
+        "strong_buy": 84,
+        "strong_sell": 12
+      },
+      "weights_a": {
+        "structure": 0.15,
+        "indicators": 0.2,
+        "sr": 0.2,
+        "candle": 0.45
+      },
+      "thresholds_a": {
+        "go": 74,
+        "strong_buy": 85,
+        "strong_sell": 10
+      },
+      "min_a_score": 68,
+      "risk": {
+        "sl_atr_mult": 1.8,
+        "tp_atr_mult": 2.2
+      },
+      "binary_otc": {
+        "expiry_mode": "next_candle",
+        "min_confidence": 78,
+        "allowed_signals": [
+          "BUY",
+          "SELL"
+        ]
+      },
+      "deep": {
+        "min_deep_score": 75,
+        "require_deep_confirm": true
+      },
+      "manipulation": {
+        "enabled": true,
+        "penalty": -35,
+        "min_wick_ratio": 0.6,
+        "volume_spike_threshold": 3.0,
+        "false_breakout_tolerance": 0.5
+      }
+    }
+  },
+  "default": {
+    "weights_z": {
+      "trend": 0.15,
+      "volume": 0.2,
+      "momentum": 0.65
+    },
+    "thresholds_z": {
+      "buy": 67,
+      "sell": 28,
+      "strong_buy": 84,
+      "strong_sell": 12
+    },
+    "weights_a": {
+      "structure": 0.15,
+      "indicators": 0.2,
+      "sr": 0.2,
+      "candle": 0.45
+    },
+    "thresholds_a": {
+      "go": 74,
+      "strong_buy": 85,
+      "strong_sell": 10
+    },
+    "min_a_score": 62,
+    "risk": {
+      "sl_atr_mult": 1.5,
+      "tp_atr_mult": 2.0
+    },
+    "binary_otc": {
+      "expiry_mode": "next_candle",
+      "min_confidence": 78,
+      "allowed_signals": [
+        "BUY",
+        "SELL"
+      ]
+    },
+    "deep": {
+      "min_deep_score": 75,
+      "require_deep_confirm": false
+    },
+    "manipulation": {
+      "enabled": false,
+      "penalty": -35,
+      "volume_spike_threshold": 3.0
+    }
+  }
+}
