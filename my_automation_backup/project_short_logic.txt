@@ -1,0 +1,2649 @@
+=== CORE LOGIC & ARCHITECTURE SUMMARY ===
+
+
+📂 FILE: data_manager.py
+-------------------------
+import time
+from data_sources import DataHub, FinnhubWebSocket
+from pairs_config import get_ws_pairs
+class DataManager:
+def __init__(self):
+def initialize(self, finnhub_api_key=None):
+def get_price(self, symbol, require_confirmation=False):
+def get_data(self, symbol, interval="5m", limit=70):
+def stage_z(self, symbol, interval="15m"):
+def stage_a(self, symbol, interval="15m"):
+def stage_d(self, symbol, interval="15m"):
+  >> signal = "WAIT"
+  >> score = 50
+  >> signal = "BUY"
+  >> score = min(75, 55 + int(roc3 * 20))
+  >> signal = "SELL"
+  >> score = min(75, 55 + int(abs(roc3) * 20))
+def get_cache_info(self):
+def clear_cache(self):
+def get_data_manager():
+def get_rows(symbol, interval="5m", limit=50):
+def get_price(symbol):
+def prefetch(pairs, interval="5m", finnhub_api_key=None):
+def start_ws():
+def cache_info():
+def stage_z(symbol, interval="15m"):
+def stage_a(symbol, interval="15m"):
+def stage_d(symbol, interval="15m"):
+===============
+
+📂 FILE: sys_data.py
+-------------------------
+import os, sys, importlib.util, json, time
+from engine import get_engine
+from data_manager import get_rows, get_price, prefetch, start_ws, cache_info
+  >> _current_scores = {}  # Real-time score storage
+class SysData:
+def __init__(self):
+def warm_up(self, pairs):
+def scan(self, market, pairs):
+  >> result = self.engine.get_z_score(sym, market, "5m", rows)
+  >> results.sort(key=lambda x: x["score"], reverse=True)
+  >> _current_scores = {r["pair"]: {
+def go(self, symbol, market):
+  >> z_result = self.engine.get_z_score(sym, market, "5m", rows)
+  >> result = self.engine.get_a_score(sym, market, "5m", rows, z_result)
+def detail(self, symbol, market):
+  >> html += d10.get_table(sym, market, "5m")
+def _load_all(self):
+def get_current_scores(self):
+  >> updated_scores = {}
+  >> updated_scores[pair] = {
+  >> updated_scores[pair] = data
+  >> updated_scores[pair] = data
+def refresh_scores(self, market, pairs):
+def _format_a_result(self, result):
+  >> a_score = result.get("a_score", 0)
+  >> a_signal = result.get("a_signal", "WAIT")
+  >> color = colors.get(a_signal, "#ffcc44")
+def _import(path, name):
+===============
+
+📂 FILE: project_scanner.py
+-------------------------
+import os
+def super_summarize():
+  >> logic_keys = ['rsi', 'ema', 'sma', 'wma', 'macd', 'bollinger',
+===============
+
+📂 FILE: GitHub_Push.py
+-------------------------
+import os
+import base64
+import requests
+import time
+def get_all_paths(root_folder):
+def should_skip(file):
+def upload_file(filepath, github_path, index, total):
+def start_backup(local_folder, github_folder):
+===============
+
+📂 FILE: main.py
+-------------------------
+import sys, json, os, gc
+from flask    import Flask, request, jsonify
+from sys_data import SysData
+from data_manager  import cache_info
+  >> MARKET_PAIRS = _CFG.get("pairs",{})
+def build_page():
+  >> <option value="">-- Market --</option>"""+mkt_opts+"""
+  >> <div id="placeholder">Select market + timeframe then SCAN</div>
+  >> fetch('/scan?market='+encodeURIComponent(_mkt)+'&tf='+encodeURIComponent(_tf))
+  >> fetch('/scores?market='+encodeURIComponent(_mkt)+'&tf='+encodeURIComponent(_tf))
+  >> var sc = !prev||Math.abs((prev.score||0)-(s.score||0))>=THR;
+  >> var ss = !prev||prev.signal!==s.signal;
+  >> var bc=s.score>=65?'sh':s.score>=40?'sm':'sl';
+  >> el.innerHTML="<span class='sb "+bc+"'>"+s.score+"%</span>";
+  >> se.textContent=s.signal;
+  >> fetch('/go?market='+encodeURIComponent(mkt)+'&pair='+encodeURIComponent(pair)+'&tf='+encodeURICompon
+  >> fetch('/detail?market='+encodeURIComponent(mkt)+'&pair='+encodeURIComponent(pair)+'&tf='+encodeURICo
+def index():
+def scan():
+  >> market  = request.args.get('market','')
+  >> pairs   = MARKET_PAIRS.get(market,[])
+  >> is_otc  = "OTC" in market
+  >> tf      = _CFG.get("market_timeframes",{}).get(market, tf)
+  >> results = sys_engine.scan(market, pairs)
+  >> score  = r.get("score",0)
+  >> trend  = r.get("trend","—")
+  >> signal = r.get("signal","WAIT")
+  >> bc = "sh" if score>=65 else "sm" if score>=40 else "sl"
+  >> "<td id='sc-"+safe+"'><span class='sb "+bc+"'>"+str(score)+"%</span></td>"
+  >> "<td id='si-"+safe+"' style='"+sc+"'>"+signal+"</td>"
+def scores():
+def go():
+  >> market = request.args.get('market','')
+  >> tf     = _CFG.get("market_timeframes",{}).get(market, tf)
+  >> html = sys_engine.go(clean, market)
+def detail():
+  >> market = request.args.get('market','')
+def mem():
+import ctypes
+def favicon():
+===============
+
+📂 FILE: pairs_config.py
+-------------------------
+import json
+import os
+def get_pairs_config():
+def get_all_pairs():
+def get_real_currency_pairs():
+def get_crypto_pairs():
+def get_commodity_pairs():
+def get_stock_pairs():
+def get_correlation_group(symbol):
+def get_pairs_by_correlation():
+def get_pairs_by_market(market_name):
+  >> market_mapping = {
+  >> pairs = market_mapping.get(market_name, [])
+  >> if market_name == "Binary OTC":
+  >> elif market_name == "CFD":
+  >> elif market_name == "Spot":
+  >> elif market_name == "Future":
+def get_ws_pairs():
+def is_real_currency_symbol(symbol):
+def is_crypto_symbol(symbol):
+def is_commodity_symbol(symbol):
+def is_stock_symbol(symbol):
+===============
+
+📂 FILE: engine.py
+-------------------------
+import os
+import sys
+import time
+import json
+from typing import Dict, Any, List, Optional
+from Groups.group_c.config_manager import get_config_loader
+from group_c.config_manager import get_config_loader
+from Z01_trend import score as z_trend_score
+from Z02_volume import score as z_volume_score
+from Z03_momentum import score as z_momentum_score
+from A01_structure import confirm as a_structure_confirm
+from A02_indicators import confirm as a_indicators_confirm
+from A03_sr import confirm as a_sr_confirm
+from A04_candle import confirm as a_candle_confirm
+class TradingEngine:
+def __init__(self):
+def get_z_score(self, symbol: str, market: str, interval: str, rows: List) -> Dict[str, Any]:
+  >> config = self.config_loader.get(symbol, market, interval)
+  >> weights_z = config.get("weights_z", {"trend": 0.35, "volume": 0.15, "momentum": 0.30})
+  >> z01_result = {"signal": "WAIT", "trend": "FLAT", "score": 40, "reason": "Not available"}
+  >> z02_result = {"score_mod": 0, "label": "N/A", "reason": "Not available"}
+  >> z03_result = {"signal": "WAIT", "score_mod": 0, "strength": "UNKNOWN", "reason": "Not available"}
+  >> z01_result = z_trend_score(symbol, interval, rows) if z_trend_score else z01_result
+  >> z01_result = {"signal": "WAIT", "trend": "FLAT", "score": 40, "reason": f"Trend error: {str(e)[:20]}
+  >> z02_result = z_volume_score(symbol, interval, rows) if z_volume_score else z02_result
+  >> z02_result = {"score_mod": 0, "label": "ERROR", "reason": f"Volume error: {str(e)[:20]}"}
+  >> z03_result = z_momentum_score(symbol, interval, rows) if z_momentum_score else z03_result
+  >> z03_result = {"signal": "WAIT", "score_mod": 0, "strength": "ERROR", "reason": f"Momentum error: {st
+  >> if z01_result.get("signal") == "BUY":
+  >> buy_points += int(weights_z.get("trend", 0.35) * 100)
+  >> elif z01_result.get("signal") == "SELL":
+  >> sell_points += int(weights_z.get("trend", 0.35) * 100)
+  >> vol_mod = z02_result.get("score_mod", 0)
+  >> mom_mod = z03_result.get("score_mod", 0)
+  >> total_weight = int(weights_z.get("trend", 0.35) * 100) + int(weights_z.get("volume", 0.15) * 100) + 
+  >> score = int(50 + (buy_points / total_weight) * 45)
+  >> signal = "BUY" if score >= thresholds_z.get("buy", 58) else "WAIT"
+  >> score = int(50 - (sell_points / total_weight) * 45)
+  >> signal = "SELL" if score <= thresholds_z.get("sell", 38) else "WAIT"
+  >> score = 50
+  >> signal = "WAIT"
+  >> score = 45
+  >> signal = "WAIT"
+  >> if signal == "BUY" and score >= thresholds_z.get("strong_buy", 72):
+  >> signal = "STRONG BUY"
+  >> elif signal == "SELL" and score <= thresholds_z.get("strong_sell", 22):
+  >> signal = "STRONG SELL"
+  >> reason = " + ".join(reasons[:3]) if reasons else "Mixed signals"
+def get_a_score(self, symbol: str, market: str, interval: str, rows: List, z_result: Dict) -> Dict[str, Any]:
+  >> config = self.config_loader.get(symbol, market, interval)
+  >> a01_result = {"signal": "WAIT", "score_mod": 0, "reason": "Not available"}
+  >> a02_result = {"signal": "WAIT", "score_mod": 0, "reason": "Not available"}
+  >> a03_result = {"signal": "WAIT", "score_mod": 0, "reason": "Not available"}
+  >> a04_result = {"signal": "WAIT", "score_mod": 0, "reason": "Not available", "forecast": {}}
+  >> a01_result = {"signal": "WAIT", "score_mod": 0, "reason": f"Structure error: {str(e)[:20]}"}
+  >> a02_result = {"signal": "WAIT", "score_mod": 0, "reason": f"Indicators error: {str(e)[:20]}"}
+  >> a03_result = {"signal": "WAIT", "score_mod": 0, "reason": f"S/R error: {str(e)[:20]}"}
+  >> a04_result = {"signal": "WAIT", "score_mod": 0, "reason": f"Candle error: {str(e)[:20]}", "forecast"
+  >> if a01_result.get("signal") == "BUY":
+  >> elif a01_result.get("signal") == "SELL":
+  >> if a02_result.get("signal") == "BUY":
+  >> elif a02_result.get("signal") == "SELL":
+  >> if a03_result.get("signal") == "BUY":
+  >> elif a03_result.get("signal") == "SELL":
+  >> if a04_result.get("signal") == "BUY":
+  >> elif a04_result.get("signal") == "SELL":
+  >> a_score = int(50 + (buy_points / total_weight) * 45)
+  >> a_signal = "BUY" if a_score >= thresholds_a.get("go", 62) else "WAIT"
+  >> a_score = int(50 - (sell_points / total_weight) * 45)
+  >> a_signal = "SELL" if a_score <= (100 - thresholds_a.get("go", 62)) else "WAIT"
+  >> a_score = 50
+  >> a_signal = "WAIT"
+  >> a_score = 45
+  >> a_signal = "WAIT"
+  >> z_direction = "BUY" if "BUY" in z_result.get("signal", "") else "SELL" if "SELL" in z_result.get("si
+  >> a_direction = a_signal
+  >> a_score = int(a_score * 0.7)  # Penalty for conflict
+  >> a_signal = "WAIT"
+  >> min_a = config.get("min_a_score", thresholds_a.get("go", 62)) if config else thresholds_a.get("go", 
+  >> if a_score >= min_a and a_signal != "WAIT":
+  >> go = a_score >= go_thresh
+  >> a_signal = "BLOCK"
+  >> sl, tp = self._calc_sl_tp(rows, a_signal, config.get("risk", {}) if config else {})
+  >> if a01_result.get("signal") == a_signal:
+  >> if a02_result.get("signal") == a_signal:
+  >> if a03_result.get("signal") == a_signal:
+  >> if a04_result.get("signal") == a_signal:
+  >> reason = "+".join(reasons[:4]) if reasons else "Mixed signals"
+def _quick_sr_position(self, rows: List) -> str:
+def _calc_sl_tp(self, rows: List, direction: str, risk_config: Dict) -> tuple:
+def get_engine() -> TradingEngine:
+===============
+
+📂 FILE: generate_future_configs.py
+-------------------------
+import os
+import json
+import hashlib
+def get_category(symbol):
+def apply_category_adjustments(config, category):
+  >> config["timeframes"][tf]["min_a_score"] = adj["min_a_score"]
+  >> elif key in adj and key == "min_a_score":
+def add_per_symbol_tweak(config, symbol):
+def write_config(symbol, config):
+def main():
+===============
+
+📂 FILE: Groups/__init__.py
+-------------------------
+===============
+
+📂 FILE: Groups/group_a/A01_structure.py
+-------------------------
+def confirm(symbol, interval="15m", rows=None):
+  >> return _r("BUY", mod, "UPTREND", f"HH+HL confirmed + CHoCH" if choch == "BULLISH" else "HH+HL confir
+  >> return _r("SELL", mod, "DOWNTREND", f"LH+LL confirmed + CHoCH" if choch == "BEARISH" else "LH+LL con
+def _r(sig, mod, structure, reason):
+===============
+
+📂 FILE: Groups/group_a/A04_candle.py
+-------------------------
+def confirm(symbol, interval="15m", rows=None):
+def _forecast(rows, current_signal):
+  >> if current_signal == "BUY":
+  >> elif current_signal == "SELL":
+def _r(sig, mod, pattern, reason, forecast):
+===============
+
+📂 FILE: Groups/group_a/A10_judge.py
+-------------------------
+===============
+
+📂 FILE: Groups/group_a/A02_indicators.py
+-------------------------
+import math
+def confirm(symbol, interval="15m", rows=None):
+  >> rsi = _rsi(closes, 14)
+  >> rsi_v = rsi[-1] if rsi else 50
+  >> rsi_div = "NONE"
+  >> if len(rsi) >= 5 and len(closes) >= 5:
+  >> rsi_div = "BULLISH"
+  >> rsi_div = "BEARISH"
+  >> e12 = _ema(closes, 12)
+  >> e26 = _ema(closes, 26)
+  >> macd = []
+  >> macd = [a - b for a, b in zip(e12[start_idx:], e26)]
+  >> sig9 = _ema(macd, 9) if len(macd) > 0 else []
+  >> if len(macd) == 0 or len(sig9) == 0:
+  >> d2 = len(macd) - len(sig9)
+  >> hist = [m - s for m, s in zip(macd[start_idx:], sig9)]
+  >> macd_signal = "WAIT"
+  >> macd_signal = "BUY"
+  >> macd_signal = "SELL"
+  >> if len(macd) >= 2 and len(sig9) >= 2:
+  >> d2 = len(macd) - len(sig9)
+  >> if len(macd[start_idx:]) >= 2 and len(sig9) >= 2:
+  >> macd_vals = macd[start_idx:]
+  >> if macd_vals[-2] <= sig9[-2] and macd_vals[-1] > sig9[-1]:
+  >> macd_signal = "BUY"
+  >> elif macd_vals[-2] >= sig9[-2] and macd_vals[-1] < sig9[-1]:
+  >> macd_signal = "SELL"
+  >> sma = sum(window) / 20
+  >> std = math.sqrt(sum((x - sma) ** 2 for x in window) / 20) if len(window) > 0 else 0
+  >> lower = sma - 2 * std
+  >> signals = []
+  >> if rsi_v < 30 or rsi_div == "BULLISH":
+  >> elif rsi_v > 70 or rsi_div == "BEARISH":
+  >> buy_c = signals.count("BUY")
+  >> sell_c = signals.count("SELL")
+  >> reason = "RSI oversold" if rsi_v < 30 else ""
+  >> reason += " + MACD bull" if macd_signal == "BUY" else ""
+  >> if rsi_div == "BULLISH":
+  >> reason += " + RSI div"
+  >> reason = "RSI overbought" if rsi_v > 70 else ""
+  >> reason += " + MACD bear" if macd_signal == "SELL" else ""
+  >> if rsi_div == "BEARISH":
+  >> reason += " + RSI div"
+  >> if macd_signal != "WAIT":
+  >> return _r("WAIT", 0, f"Mixed: RSI={round(rsi_v,1)} MACD={macd_signal} BB={bb_sig}")
+def _rsi(closes, period=14):
+  >> def _rsi(closes, period=14):
+def _ema(data, period):
+def _r(sig, mod, reason):
+===============
+
+📂 FILE: Groups/group_a/A03_sr.py
+-------------------------
+def confirm(symbol, interval="15m", rows=None):
+def _cluster(points):
+def _r(sig, mod, pos, reason, ns, nr):
+===============
+
+📂 FILE: Groups/group_f/F01_next_candle.py
+-------------------------
+import os, sys
+from data_manager import get_rows, stage_d, stage_z, stage_a
+def get_rows(*args, **kwargs):
+def forecast(symbol, interval="15m"):
+def get_table(symbol, interval="15m"):
+def _neutral(reason):
+===============
+
+📂 FILE: Groups/group_c/config_manager.py
+-------------------------
+import os
+import json
+class ConfigLoader:
+def __init__(self, base_dir=None):
+  >> self.market_folders = {
+def get(self, symbol, market, interval):
+  >> key = f"{symbol}_{market}_{interval}"
+  >> config = self._load_symbol_config(symbol, market, interval)
+  >> config = self.defaults.get(market, self._get_fallback()).copy()
+def _load_symbol_config(self, symbol, market, interval):
+  >> market_folder = self.market_folders.get(market)
+  >> file_path = os.path.join(self.config_dir, market_folder, f"{symbol}.json")
+def _load_defaults(self):
+  >> defaults[market] = json.load(f)
+def _get_fallback(self):
+def clear_cache(self):
+def reload_configs(self):
+def get_config_loader():
+===============
+
+📂 FILE: Groups/group_c/__init__.py
+-------------------------
+def __init__(self):
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/NFLX.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/NEARUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/TRUMPUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/UNIUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/WIFUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/ORANGEJUICEUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/XAUUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/PG.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/MATICUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/DAIUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/MELANIAUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/LTCUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/EURTUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/LEANHOGSUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/XPTUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/XMRUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/TURBOUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/TSLA.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/META.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/EOSUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/ETCUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/ABBV.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/SUGARUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/FDUSDUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/BRETTUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/COTTONUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/WMT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/MSFT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/MA.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/MOGUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/USDCUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/ATOMUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/BNBUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/NVDA.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/PFE.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/VETUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/BCHUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/HEATOIL.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/PEPEUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/XRPUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/AMCUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/XAGUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/AAPL.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/DOTUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/TRXUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/COFFEEUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/AAVEUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/PAXGUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/POPCATUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/FLOKIUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/CORNUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/EURCHF.py
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/USOIL.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/AVAXUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/TUSDUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/COCOAUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/AMZN.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/AMD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/JNJ.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/GOOGL.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/ETHUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/V.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/XLMUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/SPX6900USDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/SOLUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/MRK.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/CRM.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/UKOIL.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/XPDUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/COPPERUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/DOGEUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/KO.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/GASOLINE.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/WHEATUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/LIVECATTLEUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/APUUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/SOYBEANSUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/BONKUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/ADAUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/ALGOUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/GMEUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/UNH.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/XAUTUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/LINKUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/BTCUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/SHIBUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/binary_otc/NATGAS.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/AUDNOK.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/AUDNZD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/NFLX.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/NZDUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/EURNZD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/NEARUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/TRUMPUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/USDMYR.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/UNIUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/CADJPY.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/WIFUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/ORANGEJUICEUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/XAUUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/PG.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/MATICUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/DAIUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/MELANIAUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/LTCUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/USDJPY.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/USDHUF.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/EURTUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/LEANHOGSUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/XPTUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/XMRUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/TURBOUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/TSLA.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/META.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/EOSUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/EURSEK.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/ETCUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/ABBV.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/SUGARUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/FDUSDUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/EURAUD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/BRETTUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/COTTONUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/WMT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/USDILS.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/MSFT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/GBPAUD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/MA.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/USDTRY.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/MOGUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/USDCUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/GBPSEK.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/USDTHB.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/ATOMUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/BNBUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/USDCNH.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/EURCHF.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/AUDCAD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/AUDSEK.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/NVDA.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/USDPLN.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/PFE.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/EURPLN.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/VETUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/BCHUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/USDSEK.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/USDHKD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/HEATOIL.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/PEPEUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/XRPUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/AMCUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/XAGUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/USDMXN.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/AAPL.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/DOTUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/TRXUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/USDIDR.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/EURGBP.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/COFFEEUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/AAVEUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/PAXGUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/POPCATUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/USDKRW.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/EURHUF.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/GBPJPY.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/FLOKIUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/CORNUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/USOIL.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/AVAXUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/NZDJPY.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/TUSDUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/USDNOK.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/USDCZK.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/COCOAUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/EURCAD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/AMZN.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/AMD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/JNJ.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/USDSGD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/GOOGL.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/AUDJPY.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/ETHUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/V.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/XLMUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/SPX6900USDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/GBPNZD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/GBPNOK.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/SOLUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/MRK.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/CRM.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/UKOIL.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/CHFJPY.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/USDCAD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/GBPUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/XPDUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/COPPERUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/DOGEUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/USDTWD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/EURCZK.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/AUDUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/NZDCAD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/KO.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/GASOLINE.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/WHEATUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/USDZAR.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/LIVECATTLEUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/EURJPY.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/APUUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/SOYBEANSUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/BONKUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/ADAUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/ALGOUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/GMEUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/UNH.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/CADCHF.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/EURNOK.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/GBPCHF.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/USDCHF.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/XAUTUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/USDDKK.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/LINKUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/BTCUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/SHIBUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/EURUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/NATGAS.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/spot/USDBRL.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/AUDNOK.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/AUDNZD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/NFLX.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/NZDUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/EURNZD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/NEARUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/TRUMPUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/USDMYR.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/UNIUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/CADJPY.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/WIFUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/ORANGEJUICEUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/XAUUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/PG.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/MATICUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/DAIUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/MELANIAUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/LTCUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/USDJPY.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/USDHUF.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/EURTUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/LEANHOGSUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/XPTUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/XMRUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/TURBOUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/TSLA.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/META.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/EOSUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/EURSEK.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/ETCUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/ABBV.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/SUGARUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/FDUSDUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/EURAUD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/BRETTUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/COTTONUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/WMT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/USDILS.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/MSFT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/GBPAUD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/MA.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/USDTRY.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/MOGUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/USDCUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/GBPSEK.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/USDTHB.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/ATOMUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/BNBUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/USDCNH.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/EURCHF.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/AUDCAD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/AUDSEK.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/NVDA.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/USDPLN.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/PFE.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/EURPLN.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/VETUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/BCHUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/USDSEK.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/USDHKD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/HEATOIL.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/PEPEUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/XRPUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/AMCUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/XAGUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/USDMXN.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/AAPL.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/DOTUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/TRXUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/USDIDR.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/EURGBP.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/COFFEEUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/AAVEUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/PAXGUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/POPCATUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/USDKRW.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/EURHUF.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/GBPJPY.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/FLOKIUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/CORNUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/USOIL.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/AVAXUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/NZDJPY.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/TUSDUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/USDNOK.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/USDCZK.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/COCOAUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/EURCAD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/AMZN.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/AMD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/JNJ.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/USDSGD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/GOOGL.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/AUDJPY.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/ETHUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/V.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/XLMUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/SPX6900USDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/GBPNZD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/GBPNOK.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/SOLUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/MRK.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/CRM.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/UKOIL.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/CHFJPY.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/USDCAD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/GBPUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/XPDUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/COPPERUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/DOGEUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/USDTWD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/EURCZK.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/AUDUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/NZDCAD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/KO.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/GASOLINE.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/WHEATUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/USDZAR.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/LIVECATTLEUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/EURJPY.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/APUUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/SOYBEANSUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/BONKUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/ADAUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/ALGOUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/GMEUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/UNH.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/CADCHF.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/EURNOK.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/GBPCHF.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/USDCHF.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/XAUTUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/USDDKK.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/LINKUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/BTCUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/SHIBUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/EURUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/NATGAS.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/future/USDBRL.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/AUDNOK.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/AUDNZD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/NFLX.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/NZDUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/EURNZD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/NEARUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/TRUMPUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/USDMYR.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/UNIUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/CADJPY.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/WIFUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/ORANGEJUICEUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/XAUUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/PG.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/MATICUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/DAIUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/MELANIAUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/LTCUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/USDJPY.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/USDHUF.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/EURTUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/LEANHOGSUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/XPTUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/XMRUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/TURBOUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/TSLA.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/META.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/EOSUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/EURSEK.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/ETCUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/ABBV.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/SUGARUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/FDUSDUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/EURAUD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/BRETTUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/COTTONUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/WMT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/USDILS.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/MSFT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/GBPAUD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/MA.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/USDTRY.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/MOGUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/USDCUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/GBPSEK.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/USDTHB.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/ATOMUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/BNBUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/USDCNH.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/EURCHF.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/AUDCAD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/AUDSEK.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/NVDA.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/USDPLN.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/PFE.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/EURPLN.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/VETUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/BCHUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/USDSEK.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/USDHKD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/HEATOIL.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/PEPEUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/XRPUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/AMCUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/XAGUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/USDMXN.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/AAPL.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/DOTUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/TRXUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/USDIDR.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/EURGBP.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/COFFEEUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/AAVEUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/PAXGUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/POPCATUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/USDKRW.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/EURHUF.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/GBPJPY.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/FLOKIUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/CORNUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/USOIL.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/AVAXUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/NZDJPY.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/TUSDUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/USDNOK.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/USDCZK.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/COCOAUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/EURCAD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/AMZN.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/AMD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/JNJ.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/USDSGD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/GOOGL.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/AUDJPY.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/ETHUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/V.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/XLMUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/SPX6900USDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/GBPNZD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/GBPNOK.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/SOLUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/MRK.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/CRM.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/UKOIL.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/CHFJPY.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/USDCAD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/GBPUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/XPDUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/COPPERUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/DOGEUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/USDTWD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/EURCZK.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/AUDUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/NZDCAD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/KO.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/GASOLINE.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/WHEATUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/USDZAR.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/LIVECATTLEUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/EURJPY.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/APUUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/SOYBEANSUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/BONKUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/ADAUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/ALGOUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/GMEUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/UNH.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/CADCHF.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/EURNOK.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/GBPCHF.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/USDCHF.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/XAUTUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/USDDKK.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/LINKUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/BTCUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/SHIBUSDT.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/EURUSD.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/NATGAS.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_c/configs/cfd/USDBRL.json
+-------------------------
+===============
+
+📂 FILE: Groups/group_d/__init__.py
+-------------------------
+===============
+
+📂 FILE: Groups/group_d/D02_deep_structure.py
+-------------------------
+import os, sys
+from fetcher import get_rows
+def analyze(symbol, interval="15m"):
+  >> demand_zones = []
+  >> signal = "WAIT"; score = 48
+  >> signal = "BUY"
+  >> score  = int(65 + min(nearest_dem[0]["strength"]*3, 20))
+  >> signal = "SELL"
+  >> score  = int(65 + min(nearest_sup[0]["strength"]*3, 20))
+  >> signal="BUY";  score=58
+  >> signal="SELL"; score=58
+  >> summary = ("Demand zones:"+str(len(demand_zones))
+def _r(sig, score, summary, details):
+===============
+
+📂 FILE: Groups/group_d/D04_websocket.py
+-------------------------
+import os, sys, time, json
+from data_manager import get_rows, get_price
+from data_manager import get_data_manager
+def get_rows(*args, **kwargs): return []
+def get_price(*args, **kwargs): return 0
+def stage_z(symbol, interval="15m"):
+def stage_a(symbol, interval="15m"):
+  >> vol_trend = "RISING" if len(vols)>=2 and vols[-1]>vols[-2] else "FALLING"
+def stage_d(symbol, interval="15m"):
+  >> signal = "WAIT"
+  >> score  = 50
+  >> signal = "BUY"; score = min(75, 55+int(roc3*20))
+  >> signal = "SELL"; score = min(75, 55+int(abs(roc3)*20))
+def analyze(symbol, interval="15m", stage="z"):
+def get_table(symbol, interval="15m", stage="d"):
+  >> sig   = r.get("signal","WAIT")
+  >> score = r.get("score",0)
+  >> ("Live signal",   sig, "up" if sig=="BUY" else "down" if sig=="SELL" else "warn"),
+def start_websocket():
+===============
+
+📂 FILE: Groups/group_d/D01_deep_volume.py
+-------------------------
+import os, sys
+from fetcher import get_rows
+def analyze(symbol, interval="15m"):
+  >> obv_trend = "UP" if len(obvs)>=5 and obvs[-1]>obvs[-5] else "DOWN"
+  >> cvd_trend = "UP" if len(cvds)>=5 and cvds[-1]>cvds[-5] else "DOWN"
+  >> if obv_trend=="UP":   bull_pts+=2
+  >> if cvd_trend=="UP":   bull_pts+=2
+  >> score = int(50 + (bull_pts/total_pts)*40)
+  >> signal= "BUY"
+  >> score = int(50 + (bear_pts/total_pts)*40)
+  >> signal= "SELL"
+  >> score = 45; signal="WAIT"
+  >> summary = ("OBV "+obv_trend+" | CVD "+cvd_trend
+def _r(sig, score, summary, details):
+===============
+
+📂 FILE: Groups/group_d/D03_deep_indicators.py
+-------------------------
+import os, sys
+from fetcher import get_rows
+def analyze(symbol, interval="15m"):
+  >> trend_strong = adx_val > 25  # ADX>25 = strong trend
+  >> ema5_htf   = _ema(htf_closes, 5)
+  >> ema20_htf  = _ema(htf_closes, 20)
+  >> htf_bias   = "BULL" if (ema5_htf and ema20_htf and
+  >> score  = int(50+(bull/total)*42)
+  >> signal = "BUY"
+  >> score  = int(50+(bear/total)*42)
+  >> signal = "SELL"
+  >> score=45; signal="WAIT"
+def _adx(highs, lows, closes, period=14):
+def _ema(data, period):
+def _r(sig, score, summary, details):
+===============
+
+📂 FILE: Groups/group_d/D10_judge.py
+-------------------------
+import os, sys, time
+from data_manager import get_rows, stage_d, stage_z, stage_a
+def get_table(symbol, market, interval):
+===============
+
+📂 FILE: Groups/group_l/L01_loss_finder.py
+-------------------------
+import os, sys, json, datetime
+from fetcher import get_rows
+def audit(symbol, interval, signal_was, outcome, entry_price=0, exit_price=0):
+  >> def audit(symbol, interval, signal_was, outcome, entry_price=0, exit_price=0):
+def ema(data, p):
+  >> e10=ema(closes,10); e20=ema(closes,20)
+  >> if signal_was=="BUY" and e10[-1]<e20[-1]:
+  >> elif signal_was=="SELL" and e10[-1]>e20[-1]:
+  >> if signal_was=="BUY":
+  >> if signal_was=="SELL":
+  >> result = _r(sym, signal_was, outcome, reasons, hints, severity)
+def get_table(symbol, interval, signal_was="BUY", outcome="LOSS",
+  >> def get_table(symbol, interval, signal_was="BUY", outcome="LOSS",
+  >> r   = audit(symbol, interval, signal_was, outcome, entry_price, exit_price)
+def get_log():
+def _log(result):
+def _r(sym, signal_was, outcome, reasons, hints, severity):
+===============
+
+📂 FILE: Groups/group_z/Z03_momentum.py
+-------------------------
+def score(symbol, interval="15m", rows=None):
+  >> def score(symbol, interval="15m", rows=None):
+  >> rsi = 100 - (100 / (1 + (ag / al))) if al > 0 else 50
+  >> if roc5 > 0.2 and bull >= 3 and rsi < 75:
+  >> if roc5 < -0.2 and bear >= 3 and rsi > 25:
+  >> if roc5 > 0.08 and bull >= 2 and rsi < 72:
+  >> if roc5 < -0.08 and bear >= 2 and rsi > 28:
+def _m(sig, mod, strength, reason):
+===============
+
+📂 FILE: Groups/group_z/Z10_judge.py
+-------------------------
+===============
+
+📂 FILE: Groups/group_z/Z02_volume.py
+-------------------------
+def score(symbol, interval="15m", rows=None):
+  >> def score(symbol, interval="15m", rows=None):
+def _m(mod, label, reason):
+===============
+
+📂 FILE: Groups/group_z/Z01_trend.py
+-------------------------
+def score(symbol, interval="15m", rows=None):
+  >> def score(symbol, interval="15m", rows=None):
+  >> ema10 = _ema(closes, 10)
+  >> ema20 = _ema(closes, 20)
+  >> e10 = ema10[-1]
+  >> e20 = ema20[-1]
+  >> slope10 = (ema10[-1] - ema10[-5]) / ema10[-5] * 100 if ema10[-5] > 0 else 0
+  >> slope20 = (ema20[-1] - ema20[-5]) / ema20[-5] * 100 if ema20[-5] > 0 else 0
+  >> score_val = int(50 + (bull / total) * 45)
+  >> sig = "BUY" if score_val >= 55 else "WAIT"
+  >> trend = "UP"
+  >> reason = "EMA bull"
+  >> score_val = int(50 + (bear / total) * 45)
+  >> sig = "SELL" if score_val >= 55 else "WAIT"
+  >> trend = "DOWN"
+  >> reason = "EMA bear"
+def _ema(data, period):
+  >> ema = [sum(data[:period]) / period]
+def _r(sig, trend, score, reason):
+===============
+
+📂 FILE: data_sources/__init__.py
+-------------------------
+from .data_hub import DataSource, DataHub
+from .binance_ws import BinanceWebSocket
+from .finnhub_ws import FinnhubWebSocket
+from .finnhub_rest import FinnhubREST
+from .binance_rest import BinanceREST
+===============
+
+📂 FILE: data_sources/finnhub_ws.py
+-------------------------
+import websocket
+import threading
+import json
+import time
+import ssl
+from .data_hub import DataSource
+class FinnhubWebSocket(DataSource):
+def __init__(self, api_key):
+def name(self):
+def is_connected(self):
+def connect(self, symbols):
+def _run(self):
+def _on_open(self, ws):
+def _on_message(self, ws, message):
+def _on_error(self, ws, error):
+def _on_close(self, ws, close_status_code, close_msg):
+def get_price(self, symbol):
+def disconnect(self):
+===============
+
+📂 FILE: data_sources/binance_ws.py
+-------------------------
+import websocket
+import threading
+import json
+import time
+from .data_hub import DataSource
+class BinanceWebSocket(DataSource):
+def __init__(self):
+def name(self):
+def is_connected(self):
+def connect(self, symbols):
+def _run(self):
+def _on_open(self, ws):
+def _on_message(self, ws, message):
+def _on_error(self, ws, error):
+def _on_close(self, ws, code, msg):
+def get_price(self, symbol):
+def disconnect(self):
+===============
+
+📂 FILE: data_sources/binance_rest.py
+-------------------------
+import requests
+import time
+class BinanceREST:
+def __init__(self):
+def get_klines(self, symbol: str, interval: str = "5m", limit: int = 100):
+def get_price(self, symbol: str):
+===============
+
+📂 FILE: data_sources/data_hub.py
+-------------------------
+import time
+from abc import ABC, abstractmethod
+class DataSource(ABC):
+def connect(self, symbols):
+def get_price(self, symbol):
+def disconnect(self):
+def name(self):
+def is_connected(self):
+class DataHub:
+def __init__(self):
+def add_source(self, source, priority=5):
+def get_price(self, symbol, require_confirmation=False):
+def get_all_prices(self, symbol):
+def get_cached_price(self, symbol):
+def is_any_connected(self):
+def disconnect_all(self):
+===============
+
+📂 FILE: data_sources/finnhub_rest.py
+-------------------------
+import requests
+import time
+class FinnhubREST:
+def __init__(self, api_key):
+def get_klines(self, symbol, resolution="5", from_ts=None, to_ts=None, limit=100):
+def get_price(self, symbol):
+===============
