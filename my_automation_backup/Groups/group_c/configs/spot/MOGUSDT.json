@@ -1,0 +1,244 @@
+{
+  "timeframes": {
+    "5m": {
+      "weights_z": {
+        "trend": 0.25,
+        "volume": 0.35,
+        "momentum": 0.4
+      },
+      "thresholds_z": {
+        "buy": 64,
+        "sell": 36,
+        "strong_buy": 80,
+        "strong_sell": 20
+      },
+      "weights_a": {
+        "structure": 0.25,
+        "indicators": 0.35,
+        "sr": 0.2,
+        "candle": 0.2
+      },
+      "thresholds_a": {
+        "go": 70,
+        "strong_buy": 84,
+        "strong_sell": 16
+      },
+      "min_a_score": 70,
+      "risk": {
+        "sl_atr_mult": 1.8,
+        "tp_atr_mult": 2.2
+      },
+      "deep": {
+        "min_deep_score": 65,
+        "require_deep_confirm": false
+      },
+      "manipulation": {
+        "enabled": true,
+        "penalty": -20,
+        "min_wick_ratio": 0.6,
+        "volume_spike_threshold": 2.5,
+        "false_breakout_tolerance": 0.4
+      }
+    },
+    "10m": {
+      "weights_z": {
+        "trend": 0.25,
+        "volume": 0.35,
+        "momentum": 0.4
+      },
+      "thresholds_z": {
+        "buy": 64,
+        "sell": 36,
+        "strong_buy": 80,
+        "strong_sell": 20
+      },
+      "weights_a": {
+        "structure": 0.25,
+        "indicators": 0.35,
+        "sr": 0.2,
+        "candle": 0.2
+      },
+      "thresholds_a": {
+        "go": 70,
+        "strong_buy": 84,
+        "strong_sell": 16
+      },
+      "min_a_score": 70,
+      "risk": {
+        "sl_atr_mult": 1.8,
+        "tp_atr_mult": 2.2
+      },
+      "deep": {
+        "min_deep_score": 65,
+        "require_deep_confirm": false
+      },
+      "manipulation": {
+        "enabled": true,
+        "penalty": -20,
+        "min_wick_ratio": 0.6,
+        "volume_spike_threshold": 2.5,
+        "false_breakout_tolerance": 0.4
+      }
+    },
+    "15m": {
+      "weights_z": {
+        "trend": 0.25,
+        "volume": 0.35,
+        "momentum": 0.4
+      },
+      "thresholds_z": {
+        "buy": 64,
+        "sell": 36,
+        "strong_buy": 80,
+        "strong_sell": 20
+      },
+      "weights_a": {
+        "structure": 0.25,
+        "indicators": 0.35,
+        "sr": 0.2,
+        "candle": 0.2
+      },
+      "thresholds_a": {
+        "go": 70,
+        "strong_buy": 84,
+        "strong_sell": 16
+      },
+      "min_a_score": 70,
+      "risk": {
+        "sl_atr_mult": 1.8,
+        "tp_atr_mult": 2.2
+      },
+      "deep": {
+        "min_deep_score": 65,
+        "require_deep_confirm": false
+      },
+      "manipulation": {
+        "enabled": true,
+        "penalty": -20,
+        "min_wick_ratio": 0.6,
+        "volume_spike_threshold": 2.5,
+        "false_breakout_tolerance": 0.4
+      }
+    },
+    "1h": {
+      "weights_z": {
+        "trend": 0.25,
+        "volume": 0.35,
+        "momentum": 0.4
+      },
+      "thresholds_z": {
+        "buy": 64,
+        "sell": 36,
+        "strong_buy": 80,
+        "strong_sell": 20
+      },
+      "weights_a": {
+        "structure": 0.25,
+        "indicators": 0.35,
+        "sr": 0.2,
+        "candle": 0.2
+      },
+      "thresholds_a": {
+        "go": 70,
+        "strong_buy": 80,
+        "strong_sell": 20
+      },
+      "min_a_score": 70,
+      "risk": {
+        "sl_atr_mult": 1.8,
+        "tp_atr_mult": 2.2
+      },
+      "deep": {
+        "min_deep_score": 62,
+        "require_deep_confirm": false
+      },
+      "manipulation": {
+        "enabled": true,
+        "penalty": -20,
+        "min_wick_ratio": 0.6,
+        "volume_spike_threshold": 2.5,
+        "false_breakout_tolerance": 0.45
+      }
+    },
+    "4h": {
+      "weights_z": {
+        "trend": 0.25,
+        "volume": 0.35,
+        "momentum": 0.4
+      },
+      "thresholds_z": {
+        "buy": 64,
+        "sell": 36,
+        "strong_buy": 80,
+        "strong_sell": 20
+      },
+      "weights_a": {
+        "structure": 0.25,
+        "indicators": 0.35,
+        "sr": 0.2,
+        "candle": 0.2
+      },
+      "thresholds_a": {
+        "go": 70,
+        "strong_buy": 76,
+        "strong_sell": 24
+      },
+      "min_a_score": 70,
+      "risk": {
+        "sl_atr_mult": 1.8,
+        "tp_atr_mult": 2.2
+      },
+      "deep": {
+        "min_deep_score": 60,
+        "require_deep_confirm": false
+      },
+      "manipulation": {
+        "enabled": true,
+        "penalty": -20,
+        "min_wick_ratio": 0.6,
+        "volume_spike_threshold": 2.5,
+        "false_breakout_tolerance": 0.5
+      }
+    }
+  },
+  "default": {
+    "weights_z": {
+      "trend": 0.25,
+      "volume": 0.35,
+      "momentum": 0.4
+    },
+    "thresholds_z": {
+      "buy": 64,
+      "sell": 36,
+      "strong_buy": 80,
+      "strong_sell": 20
+    },
+    "weights_a": {
+      "structure": 0.25,
+      "indicators": 0.35,
+      "sr": 0.2,
+      "candle": 0.2
+    },
+    "thresholds_a": {
+      "go": 70,
+      "strong_buy": 80,
+      "strong_sell": 20
+    },
+    "min_a_score": 70,
+    "risk": {
+      "sl_atr_mult": 1.8,
+      "tp_atr_mult": 2.2
+    },
+    "deep": {
+      "min_deep_score": 62,
+      "require_deep_confirm": false
+    },
+    "manipulation": {
+      "enabled": true,
+      "penalty": -20,
+      "min_wick_ratio": 0.6,
+      "volume_spike_threshold": 2.5,
+      "false_breakout_tolerance": 0.45
+    }
+  }
+}
