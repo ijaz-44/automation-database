@@ -1,412 +1,381 @@
-# main.py — Frontend only. Sirf dikhata hai, logic nahi.
+# main.py
 import sys, json, os, gc
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
-from flask    import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template_string, send_file
 from sys_data import SysData
-from data_manager  import cache_info
+from pairs import get_pairs_by_market
+from config import HTML_TEMPLATE, MARKET_TIMEFRAMES
 
-app      = Flask(__name__)
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+print("[Main] Starting...")
+app = Flask(__name__)
 
-with open(os.path.join(BASE_DIR,"config.json")) as f:
-    _CFG = json.load(f)
+try:
+    sys_engine = SysData()
+    print("✅ [Main] SysData initialized")
+except Exception as e:
+    print(f"❌ [Main] SysData init error: {e}")
+    sys.exit(1)
 
-MARKET_PAIRS = _CFG.get("pairs",{})
-# Remove 1min and 2min scalping markets
-if "Scalp (1min)" in MARKET_PAIRS:
-    del MARKET_PAIRS["Scalp (1min)"]
-if "Scalp (2min)" in MARKET_PAIRS:
-    del MARKET_PAIRS["Scalp (2min)"]
+print("✅ [Main] Ready — http://0.0.0.0:5000")
 
-ALL_PAIRS    = list(set(
-    p.replace(" (OTC)","").strip()
-    for v in MARKET_PAIRS.values() for p in v
-))
+# ── Helper ────────────────────────────────────────────────────────────────────
+def _feel_html(feel: dict) -> str:
+    steps = feel.get("steps", 0)
+    color = feel.get("color", "red")
+    pct   = feel.get("pct", 0)
+    color_map = {"green": "#00cc66", "orange": "#ffaa00", "red": "#ff4444"}
+    bar_color = color_map.get(color, "#ff4444")
+    blocks = ""
+    for i in range(20):
+        if i < steps:
+            bc = bar_color
+        else:
+            bc = "#2a2a2a"
+        blocks += (f"<div style='width:4px;height:10px;background:{bc};"
+                   f"border-radius:1px;margin-right:1px;display:inline-block;'></div>")
+    return (f"<div style='display:flex;flex-direction:column;align-items:center;gap:2px;'>"
+            f"<div style='display:flex;align-items:center;' class='feel-blocks'>{blocks}</div>"
+            f"<span class='feel-pct' style='font-size:9px;color:{bar_color};'>{pct}%</span>"
+            f"</div>")
 
-print("[App] Starting...")
-sys_engine = SysData()
-sys_engine.warm_up(ALL_PAIRS)
-print("[App] Ready!")
+def _score_badge(score, signal) -> str:
+    if score == "NA":
+        return "<span class='sb sl'>NA</span>"
+    bc = "sh" if score >= 65 else "sm" if score >= 40 else "sl"
+    return f"<span class='sb {bc}'>{score}%</span>"
 
-# ══════════════════════════════════════════════════════
-# HTML
-# ══════════════════════════════════════════════════════
+def _trend_icon(trend) -> str:
+    return {"UP":"▲","DOWN":"▼","RANGING":"↔","FLAT":"—"}.get(trend, "—")
 
-def build_page():
-    ci   = cache_info()
-    cs   = str(ci.get("valid",0))+"/"+str(ci.get("total",0))
+def _signal_style(signal) -> str:
+    return {"STRONG BUY":"#00ff88","BUY":"#00ff88","SELL":"#ff6666",
+            "STRONG SELL":"#ff4444","WAIT":"#ffcc44"}.get(signal, "#ffcc44")
 
-    mkt_opts = "".join(
-        "<option value='"+m+"'>"+m+"</option>"
-        for m in MARKET_PAIRS if m not in ["Scalp (1min)", "Scalp (2min)"]
-    )
+def _quality_badge(quality) -> str:
+    c = {"HIGH":"#00cc66","MED":"#ffaa00","LOW":"#ff4444"}.get(quality,"#888")
+    return (f"<span style='font-size:9px;padding:1px 4px;border-radius:3px;"
+            f"background:{c}22;border:1px solid {c}66;color:{c};'>{quality}</span>")
 
-    return ("""<!DOCTYPE html><html><head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Trading Scanner</title>
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
-*{box-sizing:border-box;margin:0;padding:0;}
-body{background:#060a12;color:#c8d8e8;font-family:'Share Tech Mono','Courier New',monospace;min-height:100vh;}
-#topbar{position:sticky;top:0;z-index:100;background:rgba(6,10,18,0.96);backdrop-filter:blur(14px);border-bottom:1px solid rgba(0,255,136,0.14);padding:9px 16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
-#topbar h1{color:#00ff88;font-size:12px;letter-spacing:3px;white-space:nowrap;margin-right:4px;}
-.gsel{appearance:none;padding:6px 10px;font-family:inherit;font-size:11px;color:#e0f0ff;background:rgba(255,255,255,0.07);border:1px solid rgba(0,200,255,0.2);border-radius:8px;cursor:pointer;outline:none;}
-.gsel:hover,.gsel:focus{border-color:rgba(0,255,136,0.45);}
-.gsel option{background:#0d1520;color:#e0f0ff;}
-.tf-group{display:flex;gap:4px;}
-.tf-btn{padding:5px 9px;font-family:inherit;font-size:10px;color:#778899;cursor:pointer;border:1px solid rgba(255,255,255,0.1);border-radius:6px;background:rgba(255,255,255,0.04);transition:all 0.13s;}
-.tf-btn.on{color:#00ff88;border-color:rgba(0,255,136,0.45);background:rgba(0,255,136,0.07);}
-.tf-btn:hover{border-color:rgba(0,200,255,0.4);color:#88ffcc;}
-.scan-btn{padding:6px 16px;font-family:inherit;font-size:11px;font-weight:bold;color:#fff;cursor:pointer;border:none;border-radius:8px;background:linear-gradient(135deg,rgba(0,200,120,0.32),rgba(0,120,255,0.26));border:1px solid rgba(255,255,255,0.14);transition:all 0.16s;}
-.scan-btn:hover{transform:translateY(-1px);}
-#rbadge{font-size:10px;color:#88ffaa;padding:2px 8px;border:1px solid rgba(0,255,136,0.18);border-radius:10px;}
-#cbadge{font-size:10px;color:#88aaff;}
-#mbtn{padding:4px 9px;font-family:inherit;font-size:10px;color:#ffcc44;cursor:pointer;border:1px solid rgba(255,200,0,0.22);border-radius:6px;background:rgba(255,200,0,0.05);}
-#mbtn:hover{background:rgba(255,200,0,0.14);}
-#page{padding:12px 16px 50px;}
-#stbl{width:100%;border-collapse:collapse;font-size:11px;}
-#stbl th{background:rgba(0,50,100,0.4);color:#00ff88;padding:8px 11px;text-align:left;border-bottom:2px solid rgba(0,255,136,0.15);white-space:nowrap;position:sticky;top:46px;font-size:10px;letter-spacing:1px;}
-#stbl td{padding:7px 11px;border-bottom:1px solid rgba(255,255,255,0.04);white-space:nowrap;vertical-align:top;}
-.sb{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:bold;min-width:46px;text-align:center;transition:background 0.3s,color 0.3s;}
-.sh{background:rgba(0,255,136,0.14);color:#00ff88;border:1px solid rgba(0,255,136,0.28);}
-.sm{background:rgba(255,200,0,0.1);color:#ffcc44;border:1px solid rgba(255,200,0,0.26);}
-.sl{background:rgba(255,60,60,0.1);color:#ff6666;border:1px solid rgba(255,60,60,0.26);}
-.go-btn{padding:4px 10px;font-family:inherit;font-size:10px;font-weight:bold;color:#fff;cursor:pointer;border:1px solid rgba(255,255,255,0.15);border-radius:5px;background:rgba(0,200,120,0.18);transition:all 0.12s;}
-.go-btn:hover{background:rgba(0,200,120,0.32);}
-.go-btn.on{background:rgba(0,200,255,0.18);border-color:rgba(0,200,255,0.38);}
-.exp-row td{padding:0 0 0 14px;background:rgba(0,80,160,0.05);border-bottom:1px solid rgba(0,200,255,0.07);}
-.exp-inner{padding:10px 12px;border-left:2px solid rgba(0,200,255,0.22);}
-.det-row td{padding:0 0 0 28px;background:rgba(80,0,160,0.04);border-bottom:1px solid rgba(180,0,255,0.07);}
-.det-inner{padding:10px 12px;border-left:2px solid rgba(180,0,255,0.22);}
-.section{margin-bottom:12px;}
-.section-title{color:#4da8ff;font-size:10px;letter-spacing:1.4px;text-transform:uppercase;margin-bottom:6px;border-left:2px solid rgba(0,180,255,0.28);padding-left:6px;}
-table{width:100%;border-collapse:collapse;font-size:11px;}
-th{background:rgba(0,70,140,0.16);color:#00ff88;padding:5px 8px;text-align:left;border-bottom:1px solid rgba(0,255,136,0.1);}
-td{padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.03);}
-td.up{color:#00ff88;}td.down{color:#ff6666;}td.warn{color:#ffcc44;}
-.err-msg{color:#ff8888;font-size:11px;padding:6px 10px;background:rgba(255,60,60,0.06);border-radius:6px;border:1px solid rgba(255,60,60,0.16);}
-.btn-group{display:flex;gap:6px;margin-top:8px;}
-.btn-group button{padding:4px 10px;font-family:inherit;font-size:9px;color:#fff;cursor:pointer;border:1px solid rgba(255,255,255,0.2);border-radius:4px;transition:all 0.12s;}
-.btn-cont{background:rgba(0,200,255,0.15);border-color:rgba(0,200,255,0.3);}
-.btn-cont:hover{background:rgba(0,200,255,0.25);}
-.btn-canc{background:rgba(255,100,100,0.15);border-color:rgba(255,100,100,0.3);}
-.btn-canc:hover{background:rgba(255,100,100,0.25);}
-#placeholder{text-align:center;padding:60px;color:rgba(200,220,240,0.15);font-size:12px;letter-spacing:2px;}
-#scan-loading{display:none;padding:50px;text-align:center;color:#4da8ff;letter-spacing:2px;}
-.changed{animation:chg 0.45s ease;}
-@keyframes chg{0%{opacity:0.3;transform:scale(0.94)}100%{opacity:1;transform:scale(1)}}
-</style>
-</head><body>
-<div id="topbar">
-  <h1>SCANNER</h1>
-  <select class="gsel" id="sel-mkt">
-    <option value="">-- Market --</option>"""+mkt_opts+"""
-  </select>
-  <div class="tf-group" id="tf-row">
-    <div class="tf-btn" onclick="setTF('1m')">1m</div>
-    <div class="tf-btn" onclick="setTF('2m')">2m</div>
-    <div class="tf-btn on"  onclick="setTF('5m')">5m</div>
-    <div class="tf-btn" onclick="setTF('10m')">10m</div>
-    <div class="tf-btn" onclick="setTF('15m')">15m</div>
-  </div>
-  <button class="scan-btn" onclick="doScan()">SCAN</button>
-  <span id="rbadge">idle</span>
-  <span id="cbadge">"""+cs+"""</span>
-  <button id="mbtn" onclick="doMem()">MEM</button>
-</div>
-
-<div id="page">
-  <div id="placeholder">Select market + timeframe then SCAN</div>
-  <div id="scan-loading">Scanning...</div>
-  <div id="wrap" style="display:none"></div>
-</div>
-
-<script>
-var _mkt="",_tf="5m",_ok=false,_timer=null,_prev={};
-var THR=3; // % change threshold
-
-function setTF(tf){
-  _tf=tf;
-  document.querySelectorAll('.tf-btn').forEach(function(b){
-    b.classList.toggle('on',b.textContent===tf);
-  });
-}
-
-function doScan(){
-  _mkt=document.getElementById('sel-mkt').value;
-  if(!_mkt){alert('Market select karo!');return;}
-  document.getElementById('placeholder').style.display='none';
-  document.getElementById('wrap').style.display='none';
-  document.getElementById('scan-loading').style.display='block';
-  if(_timer) clearInterval(_timer);
-  _prev={};
-  fetch('/scan?market='+encodeURIComponent(_mkt)+'&tf='+encodeURIComponent(_tf))
-    .then(function(r){return r.text();})
-    .then(function(html){
-      document.getElementById('scan-loading').style.display='none';
-      document.getElementById('wrap').style.display='block';
-      document.getElementById('wrap').innerHTML=html;
-      _ok=true;
-      _timer=setInterval(doRefresh,5000);
-      setBadge('LIVE');
-    }).catch(function(e){
-      document.getElementById('scan-loading').style.display='none';
-      document.getElementById('wrap').innerHTML="<p class='err-msg'>"+e+"</p>";
-      document.getElementById('wrap').style.display='block';
-    });
-}
-
-function doRefresh(){
-  if(!_ok||!_mkt) return;
-  fetch('/scores?market='+encodeURIComponent(_mkt)+'&tf='+encodeURIComponent(_tf))
-    .then(function(r){return r.json();})
-    .then(function(data){
-      var changed=0;
-      Object.keys(data).forEach(function(pair){
-        var s=data[pair], prev=_prev[pair];
-        var sc = !prev||Math.abs((prev.score||0)-(s.score||0))>=THR;
-        var ss = !prev||prev.signal!==s.signal;
-        if(!sc&&!ss) return;
-        changed++;
-        _prev[pair]=s;
-        var safe=pair.replace(/[^a-zA-Z0-9]/g,'');
-        var el=document.getElementById('sc-'+safe);
-        var se=document.getElementById('si-'+safe);
-        if(!el||!se) return;
-        var bc=s.score>=65?'sh':s.score>=40?'sm':'sl';
-        el.innerHTML="<span class='sb "+bc+"'>"+s.score+"%</span>";
-        el.classList.add('changed');
-        setTimeout(function(){el.classList.remove('changed');},500);
-        var css={'STRONG BUY':'color:#00ff88;font-weight:bold',
-                 'BUY':'color:#00ff88','SELL':'color:#ff6666',
-                 'STRONG SELL':'color:#ff6666;font-weight:bold',
-                 'WAIT':'color:#ffcc44'}[s.signal]||'color:#ffcc44';
-        se.style.cssText=css;
-        se.textContent=s.signal;
-      });
-      var n=new Date();
-      setBadge(n.getHours().toString().padStart(2,'0')+':'+
-               n.getMinutes().toString().padStart(2,'0')+':'+
-               n.getSeconds().toString().padStart(2,'0')+
-               (changed?' +'+changed:''));
-    }).catch(function(){});
-}
-
-function setBadge(t){document.getElementById('rbadge').textContent=t;}
-
-function doGO(mkt,pair){
-  var safe=pair.replace(/[^a-zA-Z0-9]/g,'');
-  var rowId='exp-'+safe;
-  var row=document.getElementById(rowId);
-  var btn=document.getElementById('gb-'+safe);
-  if(row&&row.style.display!=='none'){
-    row.style.display='none';
-    if(btn)btn.classList.remove('on');
-    return;
-  }
-  if(btn)btn.classList.add('on');
-  window._cp=pair;window._cm=mkt;window._ct=_tf;
-  if(!row){
-    var mr=document.getElementById('r-'+safe);
-    if(!mr)return;
-    var tr=document.createElement('tr');
-    tr.id=rowId;tr.className='exp-row';
-    tr.innerHTML="<td colspan='7'><div class='exp-inner'><span style='color:#4da8ff'>Loading A layer...</span></div></td>";
-    mr.parentNode.insertBefore(tr,mr.nextSibling);
-  }else{
-    row.style.display='';
-    row.querySelector('.exp-inner').innerHTML="<span style='color:#4da8ff'>Loading...</span>";
-  }
-  fetch('/go?market='+encodeURIComponent(mkt)+'&pair='+encodeURIComponent(pair)+'&tf='+encodeURIComponent(_tf))
-    .then(function(r){return r.text();})
-    .then(function(html){
-      var r2=document.getElementById(rowId);
-      if(r2)r2.querySelector('.exp-inner').innerHTML=html + '<div class="btn-group"><button class="btn-cont" onclick="doContinue()">CONTINUE</button><button class="btn-canc" onclick="closeDetail()">CANCEL</button></div>';
-    }).catch(function(e){
-      var r2=document.getElementById(rowId);
-      if(r2)r2.querySelector('.exp-inner').innerHTML="<span class='err-msg'>"+e+"</span>";
-    });
-}
-
-function doContinue(){
-  var pair=window._cp,mkt=window._cm,tf=window._ct;
-  if(!pair)return;
-  var safe=pair.replace(/[^a-zA-Z0-9]/g,'');
-  var expRow=document.getElementById('exp-'+safe);
-  if(!expRow)return;
-  var detId='det-'+safe;
-  var ex=document.getElementById(detId);
-  if(!ex){
-    var tr=document.createElement('tr');
-    tr.id=detId;tr.className='det-row';
-    tr.innerHTML="<td colspan='7'><div class='det-inner'><span style='color:#b088ff'>Deep analysis...</span></div></td>";
-    expRow.parentNode.insertBefore(tr,expRow.nextSibling);
-  }else{
-    ex.style.display='';
-    ex.querySelector('.det-inner').innerHTML="<span style='color:#b088ff'>Loading...</span>";
-  }
-  fetch('/detail?market='+encodeURIComponent(mkt)+'&pair='+encodeURIComponent(pair)+'&tf='+encodeURIComponent(tf))
-    .then(function(r){return r.text();})
-    .then(function(html){
-      var dr=document.getElementById(detId);
-      if(dr)dr.querySelector('.det-inner').innerHTML=html;
-    }).catch(function(e){
-      var dr=document.getElementById(detId);
-      if(dr)dr.querySelector('.det-inner').innerHTML="<span class='err-msg'>"+e+"</span>";
-    });
-}
-
-function closeDetail(){
-  if(window._cp){
-    var expRow=document.getElementById('exp-'+window._cp.replace(/[^a-zA-Z0-9]/g,''));
-    var detRow=document.getElementById('det-'+window._cp.replace(/[^a-zA-Z0-9]/g,''));
-    if(detRow)detRow.style.display='none';
-    if(expRow)expRow.style.display='none';
-  }
-}
-
-function doMem(){
-  fetch('/mem').then(function(r){return r.json();})
-    .then(function(d){
-      document.getElementById('cbadge').textContent='MEM: '+d.freed+'MB freed';
-    }).catch(function(){});
-}
-</script>
-</body></html>""")
-
-
-# ══════════════════════════════════════════════════════
-# ROUTES
-# ══════════════════════════════════════════════════════
-
+# ── Routes ────────────────────────────────────────────────────────────────────
 @app.route('/')
 def index():
-    return build_page()
-
+    try:
+        mkt_opts = "".join(f"<option value='{m}'>{m}</option>" for m in MARKET_TIMEFRAMES.keys())
+        html = HTML_TEMPLATE.replace("<!-- MARKET_OPTIONS -->", mkt_opts)
+        return render_template_string(html)
+    except Exception as e:
+        return f"<p style='color:red'>Page error: {e}</p>", 500
 
 @app.route('/scan')
 def scan():
-    market  = request.args.get('market','')
-    tf      = request.args.get('tf','5m')
-    pairs   = MARKET_PAIRS.get(market,[])
-    is_otc  = "OTC" in market
-    tf      = _CFG.get("market_timeframes",{}).get(market, tf)
-    
+    market   = request.args.get('market',   '')
+    tf       = request.args.get('tf',       '5m')
+    src      = request.args.get('src',      'real')
+    iq_email = request.args.get('iq_email', '')
+    iq_pwd   = request.args.get('iq_pwd',   '')
+    pairs = get_pairs_by_market(market)
+    if not pairs:
+        return "<div class='err-msg'>No pairs for this market.</div>", 200
     try:
-        results = sys_engine.scan(market, pairs)
+        results = sys_engine.scan(market, pairs, src=src, interval=tf,
+                                  iq_email=iq_email, iq_pwd=iq_pwd)
+        rows_html = ""
+        for r in results:
+            pair    = r.get("pair", "")
+            score   = r.get("score", "NA")
+            trend   = r.get("trend", "FLAT")
+            sr_pos  = r.get("sr_position", "—")
+            signal  = r.get("signal", "WAIT")
+            reason  = r.get("reason", "")[:30]
+            quality = r.get("quality", "LOW")
+            feel    = r.get("feel", {"steps":0,"pct":0,"color":"red"})
+            feel_pct = feel.get("pct", 0)
+            if feel_pct == 0: status_icon = "🔴"
+            elif feel_pct < 100: status_icon = "🟡"
+            else: status_icon = "🟢"
+            status_html = f"<span class='status-light' onclick='fillSymbol(\"{pair}\")' style='cursor:pointer; font-size:14px;' title='Click to fill missing data'>{status_icon}</span>"
+            otc_badge = ""
+            if src == "iqoption" or "(OTC)" in pair:
+                otc_badge = ("<span style='font-size:8px;color:#ffcc44;background:rgba(255,200,0,0.07);"
+                             "border:1px solid rgba(255,200,0,0.2);padding:1px 4px;border-radius:3px;"
+                             "margin-left:4px;'>OTC</span>")
+            if score == "NA":
+                score_badge = "<span class='sb sl'>NA</span>"
+            else:
+                bc = "sh" if score >= 65 else "sm" if score >= 40 else "sl"
+                score_badge = f"<span class='sb {bc}'>{score}%</span>"
+            trend_icon = {"UP":"▲","DOWN":"▼","RANGING":"↔","FLAT":"—"}.get(trend, "—")
+            signal_color = {"STRONG BUY":"#00ff88","BUY":"#00ff88","SELL":"#ff6666",
+                            "STRONG SELL":"#ff4444","WAIT":"#ffcc44"}.get(signal, "#ffcc44")
+            qc = {"HIGH":"#00cc66","MED":"#ffaa00","LOW":"#ff4444"}.get(quality,"#888")
+            quality_badge = f"<span style='font-size:9px;padding:1px 4px;border-radius:3px;background:{qc}22;border:1px solid {qc}66;color:{qc};'>{quality}</span>"
+            bar_color = {"green":"#00cc66","orange":"#ffaa00","red":"#ff4444"}.get(feel.get("color","red"), "#ff4444")
+            blocks = ""
+            for i in range(20):
+                if i < feel.get("steps",0):
+                    blocks += f"<div style='width:4px;height:10px;background:{bar_color};border-radius:1px;margin-right:1px;display:inline-block;'></div>"
+                else:
+                    blocks += "<div style='width:4px;height:10px;background:#2a2a2a;border-radius:1px;margin-right:1px;display:inline-block;'></div>"
+            feel_html = f"""
+            <div style='display:flex;flex-direction:column;align-items:center;gap:2px;'>
+                <div style='display:flex;align-items:center;' class='feel-blocks'>{blocks}</div>
+                <span class='feel-pct' style='font-size:9px;color:{bar_color};'>{feel_pct}%</span>
+            </div>
+            """
+            rows_html += f"""
+<tr data-pair='{pair}'>
+  <td class='drag-handle' style='cursor:grab; text-align:center;'>☰</td>
+  <td style='text-align:center;'>{status_html}</td>
+  <td style='white-space:nowrap;'><b>{pair}</b>{otc_badge}</td>
+  <td class='score-cell'>{score_badge}</td>
+  <td>{trend_icon} {trend}</td>
+  <td style='color:#777;font-size:10px;'>{sr_pos}</td>
+  <td class='signal-cell' style='color:{signal_color};font-weight:bold;'>{signal}</td>
+  <td>{quality_badge}</td>
+  <td style='font-size:9px;color:#555;max-width:120px;overflow:hidden;'>{reason}</td>
+  <td class='feel-cell' style='min-width:100px;'>{feel_html}</td>
+  <td><button class='go-btn' onclick="doGO('{market}','{pair}','{tf}')">→</button></td>
+</tr>"""
+        return f"""
+<table id='stbl'>
+  <thead>
+    <tr>
+      <th style='width:20px;'></th>
+      <th>STATUS</th><th>PAIR</th><th>SCORE</th><th>TREND</th>
+      <th>S/R</th><th>SIGNAL</th><th>QUAL</th><th>REASON</th><th>FEEL ({tf})</th><th>GO</th>
+    </tr>
+  </thead>
+  <tbody>{rows_html}</tbody>
+</table>
+<div style='color:#444;font-size:10px;padding:6px 2px;'>
+  {len(pairs)} pairs · 65%+ strong · 40-65% mid · &lt;40% weak · auto-refresh 0.5s · Click 🔴/🟡 to fetch missing data · Drag ☰ to reorder rows
+</div>"""
     except Exception as e:
-        return f"<p class='err-msg'>Scan error: {str(e)}</p>", 500
+        print(f"❌ [Main] Scan error: {e}")
+        return f"<p class='err-msg'>Scan error: {e}</p>", 500
 
-    rows_html = ""
-    for r in results:
-        pair   = r.get("pair", r.get("symbol",""))
-        score  = r.get("score",0)
-        trend  = r.get("trend","—")
-        sr_pos = r.get("sr_position","—")
-        signal = r.get("signal","WAIT")
-        reason = r.get("reason","")[:32]
-        safe   = pair.replace(" ","").replace("(","").replace(")","")
+@app.route('/go')
+def go():
+    market = request.args.get('market', '')
+    pair   = request.args.get('pair',   '')
+    tf     = request.args.get('tf',     '5m')
+    clean  = pair.replace(" (OTC)", "").strip()
+    try:
+        result = sys_engine.go(clean, market, interval=tf)
+        if "error" in result:
+            return f"<div class='err-msg'>{result['error']}</div>"
+        return _render_a_result(result, pair, market, tf)
+    except Exception as e:
+        print(f"❌ [Main] GO error: {e}")
+        return f"<div class='err-msg'>GO error: {e}</div>", 500
 
-        bc = "sh" if score>=65 else "sm" if score>=40 else "sl"
-        td = {"UP":"<span style='color:#00ff88'>▲</span>",
-              "DOWN":"<span style='color:#ff6666'>▼</span>",
-              "RANGING":"<span style='color:#aaaaff'>↔</span>"
-              }.get(trend,"<span style='color:#ffcc44'>—</span>")
-        sc = {"STRONG BUY":"color:#00ff88;font-weight:bold",
-              "BUY":"color:#00ff88","SELL":"color:#ff6666",
-              "STRONG SELL":"color:#ff6666;font-weight:bold",
-              "WAIT":"color:#ffcc44"}.get(signal,"color:#ffcc44")
-
-        badge = ""
-        if is_otc:
-            badge = "<span style='font-size:8px;color:#999;background:rgba(255,200,0,0.07);border:1px solid rgba(255,200,0,0.15);padding:1px 3px;border-radius:3px;margin-left:4px;'>OTC</span>"
-
-        go_b = ("<button id='gb-"+safe+"' class='go-btn' onclick=\""
-                "doGO('"+market.replace("'","")+"','"+pair.replace("'","")+"')\">"
-                "GO</button>")
-
-        rows_html += (
-            "<tr id='r-"+safe+"'>"
-            "<td><b>"+pair+"</b>"+badge+"</td>"
-            "<td id='sc-"+safe+"'><span class='sb "+bc+"'>"+str(score)+"%</span></td>"
-            "<td>"+td+" "+trend+"</td>"
-            "<td style='color:#888;font-size:10px;'>"+sr_pos+"</td>"
-            "<td id='si-"+safe+"' style='"+sc+"'>"+signal+"</td>"
-            "<td style='color:#666;font-size:10px;'>"+reason+"</td>"
-            "<td>"+go_b+"</td>"
-            "</tr>"
-        )
-
-    return (
-        "<table id='stbl'><thead><tr>"
-        "<th>PAIR</th><th>SCORE</th><th>TREND</th>"
-        "<th>S/R</th><th>SIGNAL</th><th>REASON</th><th>GO</th>"
-        "</tr></thead><tbody>"+rows_html+"</tbody></table>"
-        "<div style='color:#555;font-size:10px;padding:6px 2px;'>"
-        +str(len(pairs))+" pairs | 65%+ strong | 40-65% mid | &lt;40% weak | live 5sec"
-        "</div>"
-    )
-
+@app.route('/deep')
+def deep():
+    market   = request.args.get('market', '')
+    pair     = request.args.get('pair',   '')
+    tf       = request.args.get('tf',     '5m')
+    a_result = request.args.get('a_result', '{}')
+    clean    = pair.replace(" (OTC)", "").strip()
+    try:
+        a_data = json.loads(a_result)
+        result = sys_engine.deep(clean, market, a_data, interval=tf)
+        if "error" in result:
+            return f"<div class='err-msg'>{result['error']}</div>"
+        return _render_d_result(result)
+    except Exception as e:
+        print(f"❌ [Main] Deep error: {e}")
+        return f"<div class='err-msg'>Deep error: {e}</div>", 500
 
 @app.route('/scores')
 def scores():
-    """5sec refresh — get latest scores"""
     try:
         return jsonify(sys_engine.get_current_scores())
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-
-@app.route('/go')
-def go():
-    market = request.args.get('market','')
-    pair   = request.args.get('pair','')
-    tf     = request.args.get('tf','5m')
-    tf     = _CFG.get("market_timeframes",{}).get(market, tf)
-    clean  = pair.replace(" (OTC)","").strip()
-    
+@app.route('/refresh')
+def refresh():
     try:
-        html = sys_engine.go(clean, market)
+        new_scores = sys_engine.refresh_scores()
+        return jsonify(new_scores)
     except Exception as e:
-        html = f"<div class='err-msg'>GO error: {str(e)[:80]}</div>"
-        
-    if "(OTC)" in pair:
-        html = ("<div style='font-size:10px;color:#ffcc88;padding:3px 8px;"
-                "background:rgba(255,200,0,0.06);border-radius:5px;"
-                "border:1px solid rgba(255,200,0,0.18);display:inline-block;"
-                "margin-bottom:7px;'>OTC: Real "+clean+" data</div>")+html
-    return html
+        return jsonify({"error": str(e)}), 500
 
-
-@app.route('/detail')
-def detail():
-    market = request.args.get('market','')
-    pair   = request.args.get('pair','')
-    clean  = pair.replace(" (OTC)","").strip()
-    
+@app.route('/calls')
+def calls():
     try:
-        return sys_engine.detail(clean, market)
+        stats = sys_engine.get_call_stats()
+        total = sum(stats.values())
+        html  = (f"<div style='color:#888;font-size:11px;padding:4px 8px;'>"
+                 f"REST calls — " + " | ".join(f"{k}: {v}" for k,v in stats.items())
+                 + f" | <b>Total: {total}</b></div>")
+        return html
     except Exception as e:
-        return f"<div class='err-msg'>Detail error: {str(e)[:80]}</div>"
+        return f"<span style='color:red'>{e}</span>", 500
 
+@app.route('/fill')
+def fill():
+    symbol = request.args.get('symbol', '')
+    if not symbol:
+        return jsonify({"error": "No symbol"}), 400
+    try:
+        sys_engine.fill_single(symbol)
+        return jsonify({"status": "started", "symbol": symbol})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/fill_status')
+def fill_status():
+    symbol = request.args.get('symbol', '')
+    if not symbol:
+        return jsonify({"error": "No symbol"}), 400
+    status = sys_engine.get_fill_status(symbol)
+    return jsonify(status)
+
+@app.route('/check_file')
+def check_file():
+    symbol = request.args.get('symbol', '')
+    file_type = request.args.get('type', '')
+    if not symbol or not file_type:
+        return jsonify({"exists": False}), 400
+    clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
+    base_dir = os.path.join(os.path.dirname(__file__), "market_data", "binance", "symbols")
+    if file_type == 'candles':
+        filename = f"{clean.lower()}.tsv"
+    else:
+        filename = f"{clean.lower()}_{file_type}.tsv"
+    filepath = os.path.join(base_dir, filename)
+    exists = os.path.exists(filepath)
+    return jsonify({"exists": exists})
+
+@app.route('/data/<symbol>/<data_type>')
+def view_data(symbol, data_type):
+    clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
+    base_dir = os.path.join(os.path.dirname(__file__), "market_data", "binance", "symbols")
+    if data_type == 'candles':
+        filename = f"{clean.lower()}.tsv"
+    else:
+        filename = f"{clean.lower()}_{data_type}.tsv"
+    filepath = os.path.join(base_dir, filename)
+    if not os.path.exists(filepath):
+        return f"File not found: {filename}", 404
+    return send_file(filepath, as_attachment=False, mimetype='text/plain')
+
+@app.route('/file_info')
+def file_info():
+    symbol = request.args.get('symbol', '')
+    if not symbol:
+        return jsonify({"error": "No symbol"}), 400
+    clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
+    base_dir = os.path.join(os.path.dirname(__file__), "market_data", "binance", "symbols")
+    
+    def count_rows(filename):
+        filepath = os.path.join(base_dir, filename)
+        if not os.path.exists(filepath):
+            return 0
+        try:
+            with open(filepath, 'r') as f:
+                lines = f.readlines()
+            return max(0, len(lines) - 1)  # subtract header
+        except:
+            return 0
+    
+    candles_rows = count_rows(f"{clean.lower()}.tsv")
+    cvd_rows = count_rows(f"{clean.lower()}_cvd.tsv")
+    depth_rows = count_rows(f"{clean.lower()}_depth.tsv")
+    derivative_rows = count_rows(f"{clean.lower()}_derivative.tsv")
+    correlation_rows = count_rows(f"{clean.lower()}_correlation.tsv")
+    liquidations_rows = count_rows(f"{clean.lower()}_liquidations.tsv")
+    
+    return jsonify({
+        "candles": candles_rows,
+        "cvd": cvd_rows,
+        "depth": depth_rows,
+        "derivative": derivative_rows,
+        "correlation": correlation_rows,
+        "liquidations": liquidations_rows
+    })
 
 @app.route('/mem')
 def mem():
-    gc.collect()
     try:
-        import ctypes
-        ctypes.CDLL("libc.so.6").malloc_trim(0)
-    except Exception:
-        pass
-    return jsonify({"status":"ok","freed":0})
-
+        gc.collect()
+        try:
+            import ctypes
+            ctypes.CDLL("libc.so.6").malloc_trim(0)
+        except Exception:
+            pass
+        return jsonify({"status": "ok"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/favicon.ico')
 def favicon():
     return '', 204
 
+# ── Result renderers ──────────────────────────────────────────────────────────
+def _render_a_result(r: dict, pair: str, market: str, tf: str) -> str:
+    a_score  = r.get("a_score",  "NA")
+    a_signal = r.get("a_signal", "WAIT")
+    reason   = r.get("reason",   "—")
+    sl       = r.get("sl",  0)
+    tp       = r.get("tp",  0)
+    forecast = r.get("forecast", {})
+    quality  = r.get("quality",  "LOW")
+    regime   = r.get("regime",   "—")
+    z_score  = r.get("z_score",  "—")
+    req_deep = r.get("requires_deep", False)
+    colors = {"STRONG BUY":"#00ff88","BUY":"#44cc88","STRONG SELL":"#ff4444","SELL":"#ff8866","WAIT":"#ffcc44"}
+    col = colors.get(a_signal, "#ffcc44")
+    a_json = json.dumps({"a_score": a_score, "a_signal": a_signal,
+                         "min_deep_score": r.get("min_deep_score", 60)}).replace('"', '&quot;')
+    forecast_html = ""
+    if forecast:
+        up, down, flat = forecast.get("up",50), forecast.get("down",50), forecast.get("flat",0)
+        forecast_html = f"""
+<div style='padding:8px 12px;background:rgba(255,255,255,0.02);border-radius:6px;border:1px solid rgba(255,255,255,0.06);margin-top:8px;font-size:11px;'>
+  <span style='color:#888;margin-right:8px;'>Next candle:</span>
+  <span style='color:#44cc88;'>▲ {up}%</span> &nbsp;
+  <span style='color:#ff8866;'>▼ {down}%</span> &nbsp;
+  <span style='color:#888;'>→ {flat}%</span>
+</div>"""
+    continue_btn = ""
+    if req_deep and a_signal not in ["WAIT"]:
+        continue_btn = f"""
+<div style='margin-top:10px;display:flex;gap:10px;'>
+  <button class='go-btn' style='background:#1a4a2a;border-color:#00cc66;' onclick="doDeep('{market}','{pair}','{tf}','{a_json}')">✓ Continue (Deep Analysis)</button>
+  <button class='go-btn' style='background:#4a1a1a;border-color:#cc3333;' onclick="closePanel()">✗ Cancel</button>
+</div>"""
+    elif a_signal not in ["WAIT"]:
+        continue_btn = f"<div style='margin-top:10px;display:flex;gap:10px;'><button class='go-btn' style='background:#1a3a4a;border-color:#3399cc;' onclick='closePanel()'>✓ Done</button><button class='go-btn' style='background:#4a1a1a;border-color:#cc3333;' onclick='closePanel()'>✗ Cancel</button></div>"
+    return f"""
+<div style='background:rgba(0,0,0,0.3);border:1px solid {col}44;border-radius:10px;padding:14px 18px;'>
+  <div style='display:flex;align-items:center;gap:12px;margin-bottom:10px;'>
+    <span style='color:{col};font-size:17px;font-weight:bold;'>{a_signal}</span>
+    <span style='color:{col};font-size:15px;'>{a_score}%</span>
+    {_quality_badge(quality)}
+    <span style='color:#555;font-size:10px;margin-left:auto;'>Z:{z_score} · Regime:{regime}</span>
+  </div>
+  <div style='color:#777;font-size:11px;margin-bottom:6px;'>Reason: {reason}</div>
+  <div style='color:#555;font-size:11px;'>SL: <span style='color:#ff8866;'>{round(sl,6)}</span> &nbsp;|&nbsp; TP: <span style='color:#44cc88;'>{round(tp,6)}</span></div>
+  {forecast_html}
+  {continue_btn}
+</div>"""
+
+def _render_d_result(r: dict) -> str:
+    d_score   = r.get("d_score",   "NA")
+    d_signal  = r.get("d_signal",  "WAIT")
+    confirmed = r.get("confirmed", False)
+    reason    = r.get("reason",    "—")
+    col = "#00ff88" if confirmed and "BUY" in d_signal else "#ff4444" if confirmed and "SELL" in d_signal else "#ffcc44"
+    verdict = "✅ CONFIRMED" if confirmed else "⛔ NOT CONFIRMED"
+    return f"""
+<div style='background:rgba(0,0,0,0.3);border:1px solid {col}44;border-radius:10px;padding:14px 18px;margin-top:10px;'>
+  <div style='color:{col};font-size:15px;font-weight:bold;margin-bottom:8px;'>{verdict} — D Score: {d_score}%</div>
+  <div style='color:#777;font-size:11px;'>Signal: {d_signal}</div>
+  <div style='color:#555;font-size:10px;margin-top:4px;'>{reason}</div>
+  <div style='margin-top:10px;'><button class='go-btn' style='background:#2a2a2a;' onclick='closePanel()'>Close</button></div>
+</div>"""
 
 if __name__ == "__main__":
+    print("[Main] Starting Flask server on port 5000...")
     app.run(host="0.0.0.0", port=5000, debug=False, threaded=True)
