@@ -1,0 +1,2137 @@
+================================================================================
+COMPACT PROJECT SCAN
+Time: 2026-04-09 15:53:50.734174
+================================================================================
+
+[FOLDER STRUCTURE]
+My Automation/
+  GitHub_Push.py  [3.2 KB]
+  config.py  [25.2 KB]
+  engine.py  [21.6 KB]
+  main.py  [16.4 KB]
+  pairs.py  [5.7 KB]
+  pairs_config.py  [7.4 KB]
+  project_scanner.py  [5.4 KB]
+  sys_data.py  [28.2 KB]
+  test_scan.py  [1.4 KB]
+  Groups/
+    __init__.py  [0 B]
+    group_a/
+      A01_structure.py  [2.7 KB]
+      A02_indicators.py  [5.4 KB]
+      A03_sr.py  [3.0 KB]
+      A04_candle.py  [6.1 KB]
+      A10_judge.py  [0 B]
+    group_b/
+    group_c/
+      __init__.py  [435 B]
+      config_manager.py  [5.2 KB]
+      configs/
+        binary_otc/
+          AAPL.json  [5.9 KB]
+          AAVEUSDT.json  [5.9 KB]
+          ABBV.json  [5.9 KB]
+          ADAUSDT.json  [5.9 KB]
+          ALGOUSDT.json  [5.9 KB]
+          AMCUSDT.json  [5.9 KB]
+          AMD.json  [5.9 KB]
+          AMZN.json  [5.9 KB]
+          APUUSDT.json  [5.9 KB]
+          ATOMUSDT.json  [5.9 KB]
+          AUDCAD.JSON  [5.7 KB]
+          AUDJPY.JSON  [5.7 KB]
+          AUDNOK.JSON  [5.7 KB]
+          AUDNZD.JSON  [5.7 KB]
+          AUDSEK.JSON  [5.7 KB]
+          AUDUSD.JSON  [5.7 KB]
+          AVAXUSDT.json  [5.9 KB]
+          BCHUSDT.json  [5.9 KB]
+          BNBUSDT.json  [5.9 KB]
+          BONKUSDT.json  [5.9 KB]
+          ... and 119 more files
+        cfd/
+          AAPL.json  [5.0 KB]
+          AAVEUSDT.json  [5.0 KB]
+          ABBV.json  [5.0 KB]
+          ADAUSDT.json  [5.0 KB]
+          ALGOUSDT.json  [5.0 KB]
+          AMCUSDT.json  [5.0 KB]
+          AMD.json  [5.0 KB]
+          AMZN.json  [5.0 KB]
+          APUUSDT.json  [5.0 KB]
+          ATOMUSDT.json  [5.0 KB]
+          AUDCAD.json  [5.0 KB]
+          AUDJPY.json  [5.0 KB]
+          AUDNOK.json  [5.0 KB]
+          AUDNZD.json  [5.0 KB]
+          AUDSEK.json  [5.0 KB]
+          AUDUSD.json  [5.0 KB]
+          AVAXUSDT.json  [5.0 KB]
+          BCHUSDT.json  [5.0 KB]
+          BNBUSDT.json  [5.0 KB]
+          BONKUSDT.json  [5.0 KB]
+          ... and 119 more files
+        future/
+          AAPL.json  [5.0 KB]
+          AAVEUSDT.json  [5.0 KB]
+          ABBV.json  [5.0 KB]
+          ADAUSDT.json  [5.0 KB]
+          ALGOUSDT.json  [5.0 KB]
+          AMCUSDT.json  [5.0 KB]
+          AMD.json  [5.0 KB]
+          AMZN.json  [5.0 KB]
+          APUUSDT.json  [5.0 KB]
+          ATOMUSDT.json  [5.0 KB]
+          AUDCAD.json  [5.0 KB]
+          AUDJPY.json  [5.0 KB]
+          AUDNOK.json  [5.0 KB]
+          AUDNZD.json  [5.0 KB]
+          AUDSEK.json  [5.0 KB]
+          AUDUSD.json  [5.0 KB]
+          AVAXUSDT.json  [5.0 KB]
+          BCHUSDT.json  [5.0 KB]
+          BNBUSDT.json  [5.0 KB]
+          BONKUSDT.json  [5.0 KB]
+          ... and 119 more files
+        spot/
+          AAPL.json  [5.0 KB]
+          AAVEUSDT.json  [5.0 KB]
+          ABBV.json  [5.0 KB]
+          ADAUSDT.json  [5.0 KB]
+          ALGOUSDT.json  [5.0 KB]
+          AMCUSDT.json  [5.0 KB]
+          AMD.json  [5.0 KB]
+          AMZN.json  [5.0 KB]
+          APUUSDT.json  [5.0 KB]
+          ATOMUSDT.json  [5.0 KB]
+          AUDCAD.json  [5.0 KB]
+          AUDJPY.json  [5.0 KB]
+          AUDNOK.json  [5.0 KB]
+          AUDNZD.json  [5.0 KB]
+          AUDSEK.json  [5.0 KB]
+          AUDUSD.json  [5.0 KB]
+          AVAXUSDT.json  [5.0 KB]
+          BCHUSDT.json  [5.0 KB]
+          BNBUSDT.json  [5.0 KB]
+          BONKUSDT.json  [5.0 KB]
+          ... and 119 more files
+    group_d/
+      D01_deep_volume.py  [4.5 KB]
+      D02_deep_structure.py  [4.9 KB]
+      D03_deep_indicators.py  [5.1 KB]
+      D10_judge.py  [8.0 KB]
+      __init__.py  [0 B]
+    group_f/
+      F01_next_candle.py  [5.6 KB]
+    group_h/
+    group_l/
+      L01_loss_finder.py  [5.8 KB]
+    group_w/
+    group_x/
+      X01_klines_rest.py  [937 B]
+      X02_klines_ws.py  [3.0 KB]
+      X03_cvd_rest.py  [7.4 KB]
+      X04_cvd_ws.py  [9.5 KB]
+      X05_depth_ws.py  [13.6 KB]
+      X06_depth_rest.py  [3.6 KB]
+      X07_derivative_rest.py  [10.4 KB]
+      X08_derivative_ws.py  [3.7 KB]
+      X09_correlation_rest.py  [20.0 KB]
+      X10_correlation_ws.py  [265 B]
+      __init__.py  [913 B]
+    group_z/
+      Z01_trend.py  [3.4 KB]
+      Z02_volume.py  [1.9 KB]
+      Z03_momentum.py  [3.0 KB]
+      Z10_judge.py  [0 B]
+  data_sources/
+    __init__.py  [384 B]
+    binance_rest.py  [5.8 KB]
+    binance_ws.py  [10.4 KB]
+    finnhub_rest.py  [5.7 KB]
+    finnhub_ws.py  [10.8 KB]
+    iqoption_ws.py  [10.4 KB]
+  market_data/
+    binance/
+      symbols/
+        aaveusdt.tsv  [2.7 KB]
+        adausdt.tsv  [3.0 KB]
+        algousdt.tsv  [2.9 KB]
+        atomusdt.tsv  [2.6 KB]
+        avaxusdt.tsv  [2.4 KB]
+        bchusdt.tsv  [15.4 KB]
+        bchusdt_correlation.tsv  [1.7 KB]
+        bchusdt_cvd.tsv  [67 B]
+        bchusdt_depth.tsv  [6.3 KB]
+        bchusdt_derivative.tsv  [1.0 KB]
+        bchusdt_liquidations.tsv  [30 B]
+        bnbusdt.tsv  [17.1 KB]
+        bnbusdt_cvd.tsv  [67 B]
+        bnbusdt_depth.tsv  [6.7 KB]
+        bnbusdt_derivative.tsv  [400 B]
+        bnbusdt_liquidations.tsv  [30 B]
+        bonkusdt.tsv  [3.6 KB]
+        btcusdt.tsv  [9.8 KB]
+        dogeusdt.tsv  [3.1 KB]
+        dotusdt.tsv  [2.6 KB]
+        ... and 21 more files
+    finnhub/
+      candles.json  [59.9 KB]
+      candles.tsv  [18.8 KB]
+    iqoption/
+
+Total files shown: 147
+
+[ARCHITECTURE]
+
+LAYERS: Z (fast scan) → A (single pair) → D (deep)
+PLATFORMS: Binance, Finnhub, IQ Option, Quotex
+FLOW: WS connect → 1hr data → resampling (1m→4h)
+CONFIGS: group_c/configs/<market>/<pair>.json
+
+
+[FILE DETAILS]
+
+--- sys_data.py ---
+Classes: class RealHandler:
+Functions: def update_status(symbol, component, completed=True):, def get_fill_status(symbol):, def __init__(self):
+Imports: import os, import sys, import time, import threading, import traceback
+
+--- project_scanner.py ---
+Functions: def fmt_size(size):, def extract_py_summary(lines):, def scan():
+Imports: import os, import json, import datetime
+Key Logic: if any(k in s.lower() for k in ['rsi', 'ema', 'macd', 'score', 'signal', 'buy', 
+
+--- pairs.py ---
+
+--- config.py ---
+Key Logic: <title>Signal Bot</title>
+
+--- test_scan.py ---
+Imports: import sys, import os, import json, from Groups.group_x.X03_cvd_rest import backfill_cvd
+
+--- GitHub_Push.py ---
+Functions: def get_all_paths(root_folder):, def should_skip(file):, def upload_file(filepath, github_path, index, total):
+Imports: import os, import base64, import requests, import time
+
+--- main.py ---
+Functions: def _feel_html(feel: dict) -> str:, def _score_badge(score, signal) -> str:, def _trend_icon(trend) -> str:, def _signal_style(signal) -> str:
+Imports: import sys, json, os, gc, from flask import Flask, request, jsonify, render_template_string, send_file, from sys_data import SysData, from pairs import get_pairs_by_market, from config import HTML_TEMPLATE, MARKET_TIMEFRAMES
+Key Logic: def _score_badge(score, signal) -> str: | if score == "NA": | bc = "sh" if score >= 65 else "sm" if score >= 40 else "sl" | return f"<span class='sb {bc}'>{score}%</span>" | def _signal_style(signal) -> str:
+
+--- pairs_config.py ---
+Functions: def get_pairs_config():, def get_all_pairs():, def get_real_currency_pairs():
+Imports: import json, import os
+
+--- engine.py ---
+Imports: import os, import sys, from typing import Dict, Any, List, from collections import deque, from Z01_trend    import score as z01_score
+Key Logic: from Z01_trend    import score as z01_score | from Z02_volume   import score as z02_score | from Z03_momentum import score as z03_score
+
+--- Groups/__init__.py ---
+
+--- Groups/group_a/A01_structure.py ---
+Functions: def confirm(symbol, interval="15m", rows=None):
+Key Logic: Returns market structure signal.
+
+--- Groups/group_a/A04_candle.py ---
+Functions: def confirm(symbol, interval="15m", rows=None):
+Key Logic: sig = "BUY" | sig = "SELL" | sig = "BUY" | sig = "SELL"
+
+--- Groups/group_a/A10_judge.py ---
+
+--- Groups/group_a/A02_indicators.py ---
+Functions: def confirm(symbol, interval="15m", rows=None):
+Imports: import math
+Key Logic: # A02_indicators.py — Layer 2: RSI + MACD + Bollinger | Returns indicators signal. | # ── RSI (14) ────────────────────────────────── | rsi = _rsi(closes, 14) | rsi_v = rsi[-1] if rsi else 50
+
+--- Groups/group_a/A03_sr.py ---
+Functions: def confirm(symbol, interval="15m", rows=None):
+Key Logic: return _r("BUY", mod, "Near Support", f"Support {round(ns,5)} ({touches}x) {ds}%
+
+--- Groups/group_c/config_manager.py ---
+Classes: class ConfigLoader:
+Functions: def __init__(self, base_dir=None):, def get(self, symbol, market, interval):, def _load_symbol_config(self, symbol, market, interval):
+Imports: import os, import json
+
+--- Groups/group_c/__init__.py ---
+Functions: def __init__(self):
+
+--- Groups/group_c/configs/binary_otc/NFLX.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/NEARUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/TRUMPUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/UNIUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/WIFUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/ORANGEJUICEUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/XAUUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/PG.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/MATICUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/DAIUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/MELANIAUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/LTCUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/EURTUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/LEANHOGSUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/XPTUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/XMRUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/TURBOUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/TSLA.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/META.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/EOSUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/ETCUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/ABBV.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/SUGARUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/FDUSDUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/BRETTUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/COTTONUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/WMT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/MSFT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/MA.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/MOGUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/USDCUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/ATOMUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/BNBUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/NVDA.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/PFE.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/VETUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/BCHUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/HEATOIL.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/PEPEUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/XRPUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/AMCUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/XAGUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/AAPL.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/DOTUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/TRXUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/COFFEEUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/AAVEUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/PAXGUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/POPCATUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/FLOKIUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/CORNUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/EURCHF.py ---
+Key Logic: "buy": 72, | "sell": 26, | "strong_buy": 88, | "strong_sell": 10 | "strong_buy": 90,
+
+--- Groups/group_c/configs/binary_otc/USOIL.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/AVAXUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/TUSDUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/COCOAUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/AMZN.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/AMD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/JNJ.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/GOOGL.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/ETHUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/V.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/XLMUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/SPX6900USDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/SOLUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/MRK.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/CRM.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/UKOIL.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/XPDUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/COPPERUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/DOGEUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/KO.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/GASOLINE.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/WHEATUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/LIVECATTLEUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/APUUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/SOYBEANSUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/BONKUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/ADAUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/ALGOUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/GMEUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/UNH.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/XAUTUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/LINKUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/BTCUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/SHIBUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/binary_otc/NATGAS.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1053)
+
+--- Groups/group_c/configs/cfd/AUDNOK.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/AUDNZD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/NFLX.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/cfd/NZDUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/EURNZD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/NEARUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/TRUMPUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/USDMYR.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/UNIUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/CADJPY.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/WIFUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/ORANGEJUICEUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/cfd/XAUUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/cfd/PG.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/cfd/MATICUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/DAIUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/MELANIAUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/LTCUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/USDJPY.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/USDHUF.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/EURTUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/LEANHOGSUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/cfd/XPTUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/cfd/XMRUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/TURBOUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/TSLA.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/cfd/META.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/cfd/EOSUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/EURSEK.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/ETCUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/ABBV.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/cfd/SUGARUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/cfd/FDUSDUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/EURAUD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/BRETTUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/COTTONUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/cfd/WMT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/cfd/USDILS.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/MSFT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/cfd/GBPAUD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/MA.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/cfd/USDTRY.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/MOGUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/USDCUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/GBPSEK.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/USDTHB.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/ATOMUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/BNBUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/USDCNH.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/EURCHF.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/AUDCAD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/AUDSEK.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/NVDA.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/cfd/USDPLN.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/PFE.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/cfd/EURPLN.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/VETUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/BCHUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/USDSEK.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/USDHKD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/HEATOIL.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/cfd/PEPEUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/XRPUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/AMCUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/XAGUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/cfd/USDMXN.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/AAPL.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/cfd/DOTUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/TRXUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/USDIDR.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/EURGBP.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/COFFEEUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/cfd/AAVEUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/PAXGUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/POPCATUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/USDKRW.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/EURHUF.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/GBPJPY.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/FLOKIUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/CORNUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/cfd/USOIL.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/cfd/AVAXUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/NZDJPY.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/TUSDUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/USDNOK.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/USDCZK.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/COCOAUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/cfd/EURCAD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/AMZN.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/cfd/AMD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/cfd/JNJ.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/cfd/USDSGD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/GOOGL.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/cfd/AUDJPY.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/ETHUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/V.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/cfd/XLMUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/SPX6900USDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/GBPNZD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/GBPNOK.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/SOLUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/MRK.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/cfd/CRM.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/cfd/UKOIL.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/cfd/CHFJPY.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/USDCAD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/GBPUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/XPDUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/cfd/COPPERUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/cfd/DOGEUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/USDTWD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/EURCZK.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/AUDUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/NZDCAD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/KO.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/cfd/GASOLINE.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/cfd/WHEATUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/cfd/USDZAR.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/LIVECATTLEUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/cfd/EURJPY.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/APUUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/SOYBEANSUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/cfd/BONKUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/ADAUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/ALGOUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/GMEUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/UNH.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/cfd/CADCHF.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/EURNOK.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/GBPCHF.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/USDCHF.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/XAUTUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/USDDKK.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/LINKUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/BTCUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/SHIBUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/EURUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/cfd/NATGAS.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/cfd/USDBRL.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1041)
+
+--- Groups/group_c/configs/future/AUDNOK.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/AUDNZD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/NFLX.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1038)
+
+--- Groups/group_c/configs/future/NZDUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/EURNZD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/NEARUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/TRUMPUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/USDMYR.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/UNIUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/CADJPY.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/WIFUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/ORANGEJUICEUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1034)
+
+--- Groups/group_c/configs/future/XAUUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1034)
+
+--- Groups/group_c/configs/future/PG.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1038)
+
+--- Groups/group_c/configs/future/MATICUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/DAIUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/MELANIAUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/LTCUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/USDJPY.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/USDHUF.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/EURTUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/LEANHOGSUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1034)
+
+--- Groups/group_c/configs/future/XPTUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1034)
+
+--- Groups/group_c/configs/future/XMRUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/TURBOUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/TSLA.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1038)
+
+--- Groups/group_c/configs/future/META.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1038)
+
+--- Groups/group_c/configs/future/EOSUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/EURSEK.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/ETCUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/ABBV.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1038)
+
+--- Groups/group_c/configs/future/SUGARUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1034)
+
+--- Groups/group_c/configs/future/FDUSDUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/EURAUD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/BRETTUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/COTTONUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1034)
+
+--- Groups/group_c/configs/future/WMT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1038)
+
+--- Groups/group_c/configs/future/USDILS.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/MSFT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1038)
+
+--- Groups/group_c/configs/future/GBPAUD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/MA.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1038)
+
+--- Groups/group_c/configs/future/USDTRY.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/MOGUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/USDCUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/GBPSEK.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/USDTHB.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/ATOMUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/BNBUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/USDCNH.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/EURCHF.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/AUDCAD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/AUDSEK.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/NVDA.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1038)
+
+--- Groups/group_c/configs/future/USDPLN.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/PFE.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1038)
+
+--- Groups/group_c/configs/future/EURPLN.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/VETUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/BCHUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/USDSEK.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/USDHKD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/HEATOIL.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1034)
+
+--- Groups/group_c/configs/future/PEPEUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/XRPUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/AMCUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/XAGUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1034)
+
+--- Groups/group_c/configs/future/USDMXN.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/AAPL.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1038)
+
+--- Groups/group_c/configs/future/DOTUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/TRXUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/USDIDR.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/EURGBP.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/COFFEEUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1034)
+
+--- Groups/group_c/configs/future/AAVEUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/PAXGUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/POPCATUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/USDKRW.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/EURHUF.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/GBPJPY.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/FLOKIUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/CORNUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1034)
+
+--- Groups/group_c/configs/future/USOIL.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1034)
+
+--- Groups/group_c/configs/future/AVAXUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/NZDJPY.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/TUSDUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/USDNOK.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/USDCZK.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/COCOAUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1034)
+
+--- Groups/group_c/configs/future/EURCAD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/AMZN.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1038)
+
+--- Groups/group_c/configs/future/AMD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1038)
+
+--- Groups/group_c/configs/future/JNJ.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1038)
+
+--- Groups/group_c/configs/future/USDSGD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/GOOGL.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1038)
+
+--- Groups/group_c/configs/future/AUDJPY.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/ETHUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/V.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1038)
+
+--- Groups/group_c/configs/future/XLMUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/SPX6900USDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/GBPNZD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/GBPNOK.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/SOLUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/MRK.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1038)
+
+--- Groups/group_c/configs/future/CRM.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1038)
+
+--- Groups/group_c/configs/future/UKOIL.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1034)
+
+--- Groups/group_c/configs/future/CHFJPY.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/USDCAD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/GBPUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/XPDUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1034)
+
+--- Groups/group_c/configs/future/COPPERUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1034)
+
+--- Groups/group_c/configs/future/DOGEUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/USDTWD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/EURCZK.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/AUDUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/NZDCAD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/KO.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1038)
+
+--- Groups/group_c/configs/future/GASOLINE.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1034)
+
+--- Groups/group_c/configs/future/WHEATUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1034)
+
+--- Groups/group_c/configs/future/USDZAR.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/LIVECATTLEUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1034)
+
+--- Groups/group_c/configs/future/EURJPY.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/APUUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/SOYBEANSUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1034)
+
+--- Groups/group_c/configs/future/BONKUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/ADAUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/ALGOUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/GMEUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/UNH.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1038)
+
+--- Groups/group_c/configs/future/CADCHF.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/EURNOK.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/GBPCHF.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/USDCHF.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/XAUTUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/USDDKK.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/LINKUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/BTCUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/SHIBUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/EURUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/future/NATGAS.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1034)
+
+--- Groups/group_c/configs/future/USDBRL.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/spot/AUDNOK.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/AUDNZD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/NFLX.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/NZDUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/EURNZD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/NEARUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/spot/TRUMPUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/spot/USDMYR.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/UNIUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/spot/CADJPY.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/WIFUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/spot/ORANGEJUICEUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/spot/XAUUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/spot/PG.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/MATICUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/spot/DAIUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/spot/MELANIAUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/spot/LTCUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/spot/USDJPY.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/USDHUF.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/EURTUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/spot/LEANHOGSUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/spot/XPTUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/spot/XMRUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/spot/TURBOUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/spot/TSLA.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/META.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/EOSUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/spot/EURSEK.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/ETCUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/spot/ABBV.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/SUGARUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/spot/FDUSDUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/spot/EURAUD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/BRETTUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/spot/COTTONUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/spot/WMT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/USDILS.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/MSFT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/GBPAUD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/MA.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/USDTRY.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/MOGUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/spot/USDCUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/spot/GBPSEK.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/USDTHB.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/ATOMUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/spot/BNBUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/spot/USDCNH.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/EURCHF.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/AUDCAD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/AUDSEK.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/NVDA.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/USDPLN.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/PFE.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/EURPLN.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/VETUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/spot/BCHUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/spot/USDSEK.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/USDHKD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/HEATOIL.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/spot/PEPEUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/spot/XRPUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/spot/AMCUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/spot/XAGUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/spot/USDMXN.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/AAPL.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/DOTUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/spot/TRXUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/spot/USDIDR.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/EURGBP.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/COFFEEUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/spot/AAVEUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/spot/PAXGUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/spot/POPCATUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/spot/USDKRW.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/EURHUF.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/GBPJPY.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/FLOKIUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/spot/CORNUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/spot/USOIL.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/spot/AVAXUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/spot/NZDJPY.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/TUSDUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/spot/USDNOK.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/USDCZK.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/COCOAUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/spot/EURCAD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/AMZN.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/AMD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/JNJ.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/USDSGD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/GOOGL.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/AUDJPY.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/ETHUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/spot/V.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/XLMUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/spot/SPX6900USDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/spot/GBPNZD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/GBPNOK.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/SOLUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/spot/MRK.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/CRM.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/UKOIL.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/spot/CHFJPY.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/USDCAD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/GBPUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/XPDUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/spot/COPPERUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/spot/DOGEUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/spot/USDTWD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/EURCZK.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/AUDUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/NZDCAD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/KO.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/GASOLINE.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/spot/WHEATUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/spot/USDZAR.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/LIVECATTLEUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/spot/EURJPY.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/APUUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/spot/SOYBEANSUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/spot/BONKUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/spot/ADAUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/spot/ALGOUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/spot/GMEUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/spot/UNH.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/CADCHF.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/EURNOK.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/GBPCHF.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/USDCHF.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/XAUTUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/spot/USDDKK.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/LINKUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/spot/BTCUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/spot/SHIBUSDT.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1039)
+
+--- Groups/group_c/configs/spot/EURUSD.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_c/configs/spot/NATGAS.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1035)
+
+--- Groups/group_c/configs/spot/USDBRL.json ---
+Error: Expecting property name enclosed in double quotes: line 51 column 1 (char 1037)
+
+--- Groups/group_d/__init__.py ---
+
+--- Groups/group_d/D02_deep_structure.py ---
+Functions: def analyze(symbol, interval="15m"):
+Imports: import os, sys, from fetcher import get_rows
+Key Logic: # Demand/Supply zones + Fair Value Gaps + Order Blocks | # ── Demand Zones (strong bullish candles) ───── | demand_zones = [] | demand_zones.append({
+
+--- Groups/group_d/D01_deep_volume.py ---
+Functions: def analyze(symbol, interval="15m"):
+Imports: import os, sys, from fetcher import get_rows
+Key Logic: # Estimate: bullish candle = buy vol, bearish = sell vol
+
+--- Groups/group_d/D03_deep_indicators.py ---
+Functions: def analyze(symbol, interval="15m"):
+Imports: import os, sys, from fetcher import get_rows
+Key Logic: if stoch_k < 20 and stoch_d < 20: stoch_sig="BUY" | elif stoch_k > 80 and stoch_d > 80: stoch_sig="SELL" | elif stoch_k > stoch_d and stoch_k < 50: stoch_sig="BUY" | elif stoch_k < stoch_d and stoch_k > 50: stoch_sig="SELL" | wr_sig = "BUY" if wr<-80 else "SELL" if wr>-20 else "WAIT"
+
+--- Groups/group_d/D10_judge.py ---
+Functions: def get_table(symbol, market, interval, rows):
+
+--- Groups/group_f/F01_next_candle.py ---
+Functions: def get_rows(*args, **kwargs):, def forecast(symbol, interval="15m"):
+Imports: import os, sys, from data_manager import get_rows, stage_d, stage_z, stage_a
+
+--- Groups/group_l/L01_loss_finder.py ---
+Functions: def audit(symbol, interval, signal_was, outcome, entry_price=0, exit_price=0):
+Imports: import os, sys, json, datetime, from fetcher import get_rows
+Key Logic: def audit(symbol, interval, signal_was, outcome, entry_price=0, exit_price=0): | return _r(sym, signal_was, outcome, ["No data to analyze"], [], 0)
+
+--- Groups/group_x/__init__.py ---
+Imports: from .X01_klines_rest import fetch_klines, from .X02_klines_ws import BinanceKlinesWebSocket, from .X03_cvd_rest import backfill_cvd_advanced, from .X04_cvd_ws import CVDWebSocket, from .X05_depth_ws import DepthWebSocket
+
+--- Groups/group_x/X09_correlation_rest.py ---
+Classes: class CorrelationRest:
+Functions: def __init__(self, base_dir):, def _pre_fill_history(self):
+Imports: import requests, import time, import os, import threading, import math
+Key Logic: print("[X09_correlation_rest] One-click two rows: first row (prev min) zscore=0,
+
+--- Groups/group_x/X08_derivative_ws.py ---
+Classes: class DerivativeWebSocket:
+Functions: def __init__(self, base_dir, derivative_rest, min_quantity=1.0):, def start(self, symbols):, def _run(self):
+Imports: import websocket, import threading, import json, import time, import ssl
+
+--- Groups/group_x/X07_derivative_rest.py ---
+Classes: class DerivativeRest:
+Functions: def __init__(self, base_dir):, def fetch_open_interest(self, symbol):, def fetch_oi_history(self, symbol, period="5m", limit=24):, def fetch_long_short_ratio_history(self, symbol, period="5m", limit=24):
+Imports: import requests, import json, import time, import os, import threading
+
+--- Groups/group_x/X06_depth_rest.py ---
+Functions: def fetch_depth_snapshot(symbol, limit=500, retries=2):, def compute_liquidity_heatmap(book, price_bucket_size=1.0):, def detect_iceberg_orders(book, threshold_qty=10.0, top_n=10):
+Imports: import requests, import time, from collections import defaultdict
+
+--- Groups/group_x/X05_depth_ws.py ---
+Classes: class DepthWebSocket:
+Functions: def __init__(self, base_dir):, def add_symbol(self, symbol):
+Imports: import websocket, import threading, import json, import time, import ssl
+
+--- Groups/group_x/X04_cvd_ws.py ---
+Classes: class CVDWebSocket:
+Functions: def __init__(self, base_dir):, def set_symbols(self, symbols):
+Imports: import websocket, import threading, import json, import time, import ssl
+
+--- Groups/group_x/X01_klines_rest.py ---
+Functions: def fetch_klines(symbol, interval="1m", limit=100):
+Imports: import requests, import time
+
+--- Groups/group_x/X03_cvd_rest.py ---
+Functions: def fetch_agg_trades(symbol, limit=1000, from_id=None):, def compute_metrics(trades, max_cluster_levels=50):
+Imports: import requests, import time, import traceback, import os   # <-- added for path handling
+Key Logic: 'is_sell': t['m'],
+
+--- Groups/group_x/X02_klines_ws.py ---
+Classes: class BinanceKlinesWebSocket:
+Functions: def __init__(self):, def connect(self, symbols, callback):, def _build_url(self):, def _run_with_reconnect(self):, def _on_open(self, ws):
+Imports: import websocket, import threading, import json, import time, import ssl
+
+--- Groups/group_x/X10_correlation_ws.py ---
+Classes: class CorrelationWebSocket:
+Functions: def __init__(self, base_dir):, def start(self):, def stop(self):
+
+--- Groups/group_z/Z03_momentum.py ---
+Functions: def score(symbol, interval="15m", rows=None):
+Key Logic: def score(symbol, interval="15m", rows=None): | Returns momentum signal and score modifier. | # RSI simplified (7 period) | rsi = 100 - (100 / (1 + (ag / al))) if al > 0 else 50 | if roc5 > 0.2 and bull >= 3 and rsi < 75:
+
+--- Groups/group_z/Z10_judge.py ---
+
+--- Groups/group_z/Z02_volume.py ---
+Functions: def score(symbol, interval="15m", rows=None):
+Key Logic: def score(symbol, interval="15m", rows=None): | Returns volume signal and score modifier.
+
+--- Groups/group_z/Z01_trend.py ---
+Functions: def score(symbol, interval="15m", rows=None):
+Key Logic: def score(symbol, interval="15m", rows=None): | Returns trend direction and signal. | # EMA 10 and EMA 20 | ema10 = _ema(closes, 10) | ema20 = _ema(closes, 20)
+
+--- data_sources/__init__.py ---
+Imports: from .binance_ws   import BinanceWebSocket, from .binance_rest import BinanceREST, from .finnhub_ws   import FinnhubWebSocket, from .finnhub_rest import FinnhubREST, from .iqoption_ws  import IQOptionWS
+
+--- data_sources/finnhub_ws.py ---
+Classes: class FinnhubWebSocket:
+Functions: def __init__(self, api_key=None):, def _load_data(self):
+Imports: import websocket, import threading, import json, import time, import ssl
+
+--- data_sources/binance_ws.py ---
+Classes: class BinanceWebSocket:
+Functions: def __init__(self):, def _get_symbol_file(self, symbol):, def _load_symbol(self, symbol):
+Imports: import websocket, import threading, import json, import time, import ssl
+
+--- data_sources/binance_rest.py ---
+Classes: class BinanceREST:
+Functions: def __init__(self):, def _get_symbol_file(self, symbol):, def _load_symbol(self, symbol):
+Imports: import requests, import time, import os
+
+--- data_sources/iqoption_ws.py ---
+Classes: class IQOptionWS:
+Functions: def __init__(self):, def _load_data(self):
+Imports: import json, import time, import os, import threading
+Key Logic: IQ_EMAIL    = ""
+
+--- data_sources/finnhub_rest.py ---
+Classes: class FinnhubREST:
+Functions: def __init__(self):, def _load(self):
+Imports: import requests, import json, import time, import datetime, import os
+
+--- market_data/finnhub/candles.json ---
+{
+  "nvda": [
+    [
+      1774966559492,
+      169.89,
+      170.14,
+      169.88,
+      170.14,
+      0
+    ],
+    [
+      1774966798705,
+      170.8,
+      170.82,
+      170.615,
+      170.74,
+      0
+    ],
+    [
+      1774966856818,
+      170.65,
+      170.75,
+      170.46,
+      170.54,
+      0
+    ],
+    [
+      1774968839068,
+      170.03,
+      170.05,
+      169.88,
+      169.89,
+      0
+    ],
+    [
+      1774970279340,
+      170.58,
+      170.66,
+      170.49,
+      170.49,
+      0
+    ],
+    [
+      1774970397480,
+      170.56,
+      170.62,
+      170.37,
+      170.41,
+      0
+    ],
+    [
+      1774970459747,
+      170.4,
+      170.4,
+      170.15,
+      170.17,
+      0
+    ],
+    [
+      1774970474370,
+      170.14,
+      170.26,
+      170.13,
+      170.15,
+      0
+    ],
+    
+... (truncated)
+
+[CONFIG EXAMPLES]
+
+USDCAD.JSON:
+{
+  "timeframes": {
+    "1m": {
+      "weights_z": {
+        "trend": 0.2,
+        "volume": 0.2,
+        "momentum": 0.6
+      },
+      "thresholds_z": {
+        "buy": 72,
+        "sell": 26,
+        "strong_buy": 88,
+        "strong_sell": 10
+      },
+      "weights_a": {
+        "structure": 0.2,
+        "indicators": 0.2,
+        "sr": 0.2,
+        "candle": 0.4
+      },
+      "thresholds_a": {
+        "go": 80,
+        "strong_buy": 90,
+        "strong_sell": 8
+      },
+      "min_a_score"
+
+NFLX.json:
+{
+  "timeframes": {
+    "1m": {
+      "weights_z": {
+        "trend": 0.3,
+        "volume": 0.25,
+        "momentum": 0.45
+      },
+      "thresholds_z": {
+        "buy": 69,
+        "sell": 28,
+        "strong_buy": 86,
+        "strong_sell": 12
+      },
+      "weights_a": {
+        "structure": 0.3,
+        "indicators": 0.25,
+        "sr": 0.25,
+        "candle": 0.2
+      },
+      "thresholds_a": {
+        "go": 75,
+        "strong_buy": 86,
+        "strong_sell": 12
+      },
+      "min_a_s
+
+AUDNOK.json:
+{
+  "timeframes": {
+    "5m": {
+      "weights_z": {
+        "trend": 0.35,
+        "volume": 0.3,
+        "momentum": 0.35
+      },
+      "thresholds_z": {
+        "buy": 61,
+        "sell": 38,
+        "strong_buy": 78,
+        "strong_sell": 22
+      },
+      "weights_a": {
+        "structure": 0.3,
+        "indicators": 0.3,
+        "sr": 0.2,
+        "candle": 0.2
+      },
+      "thresholds_a": {
+        "go": 67,
+        "strong_buy": 84,
+        "strong_sell": 16
+      },
+      "min_a_sco
+
+AUDNZD.json:
+{
+  "timeframes": {
+    "5m": {
+      "weights_z": {
+        "trend": 0.35,
+        "volume": 0.3,
+        "momentum": 0.35
+      },
+      "thresholds_z": {
+        "buy": 63,
+        "sell": 38,
+        "strong_buy": 78,
+        "strong_sell": 22
+      },
+      "weights_a": {
+        "structure": 0.3,
+        "indicators": 0.3,
+        "sr": 0.2,
+        "candle": 0.2
+      },
+      "thresholds_a": {
+        "go": 69,
+        "strong_buy": 84,
+        "strong_sell": 16
+      },
+      "min_a_sco
+
+AUDNOK.json:
+{
+  "timeframes": {
+    "5m": {
+      "weights_z": {
+        "trend": 0.35,
+        "volume": 0.2,
+        "momentum": 0.45
+      },
+      "thresholds_z": {
+        "buy": 63,
+        "sell": 36,
+        "strong_buy": 82,
+        "strong_sell": 18
+      },
+      "weights_a": {
+        "structure": 0.3,
+        "indicators": 0.25,
+        "sr": 0.2,
+        "candle": 0.25
+      },
+      "thresholds_a": {
+        "go": 67,
+        "strong_buy": 86,
+        "strong_sell": 14
+      },
+      "min_a_s
+
+AUDNZD.json:
+{
+  "timeframes": {
+    "5m": {
+      "weights_z": {
+        "trend": 0.35,
+        "volume": 0.2,
+        "momentum": 0.45
+      },
+      "thresholds_z": {
+        "buy": 65,
+        "sell": 36,
+        "strong_buy": 82,
+        "strong_sell": 18
+      },
+      "weights_a": {
+        "structure": 0.3,
+        "indicators": 0.25,
+        "sr": 0.2,
+        "candle": 0.25
+      },
+      "thresholds_a": {
+        "go": 69,
+        "strong_buy": 86,
+        "strong_sell": 14
+      },
+      "min_a_s
+
+[MARKET DATA]
+binance: 1 files
+iqoption: 0 files
+finnhub: 2 files
