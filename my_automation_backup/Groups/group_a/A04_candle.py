@@ -10,6 +10,7 @@ def confirm(symbol, interval="15m", rows=None):
         c = rows[-1]
         p = rows[-2]
         pp = rows[-3]
+        ppp = rows[-4] if len(rows) >= 4 else None
         
         co, cc = c["open"], c["close"]
         po, pc = p["open"], p["close"]
@@ -24,7 +25,7 @@ def confirm(symbol, interval="15m", rows=None):
         sig = "WAIT"
         mod = 0
         
-        # ── 3-candle patterns (most reliable) ─────────
+        # ========== 3-candle patterns ==========
         # Morning Star
         if (pc < po and abs(pc - po) < abs(ppo - ppc) * 0.35 and cc > co and cc > (ppo + ppc) / 2):
             pattern = "Morning Star"
@@ -49,7 +50,7 @@ def confirm(symbol, interval="15m", rows=None):
             sig = "SELL"
             mod = 16
         
-        # ── 2-candle patterns ─────────────────────────
+        # ========== 2-candle patterns ==========
         # Bullish Engulfing
         elif cc > co and pc < po and co < pc and cc > po:
             pattern = "Bullish Engulfing"
@@ -62,20 +63,44 @@ def confirm(symbol, interval="15m", rows=None):
             sig = "SELL"
             mod = 16
         
-        # ── Single candle ─────────────────────────────
-        # Pin Bar Bullish (long lower wick)
-        elif lw > rng_c * 0.62 and body_c < rng_c * 0.3:
-            pattern = "Pin Bar Bull"
+        # Bullish Harami (small body inside previous)
+        elif cc > co and pc < po and co < pc and cc < po:
+            pattern = "Bullish Harami"
             sig = "BUY"
             mod = 12
         
-        # Pin Bar Bearish (long upper wick)
-        elif uw > rng_c * 0.62 and body_c < rng_c * 0.3:
-            pattern = "Pin Bar Bear"
+        # Bearish Harami
+        elif cc < co and pc > po and co > pc and cc > po:
+            pattern = "Bearish Harami"
             sig = "SELL"
             mod = 12
         
-        # Strong bull body
+        # Piercing Line
+        elif cc > co and pc < po and cc > (po + pc) / 2 and co < pc:
+            pattern = "Piercing Line"
+            sig = "BUY"
+            mod = 14
+        
+        # Dark Cloud Cover
+        elif cc < co and pc > po and cc < (po + pc) / 2 and co > pc:
+            pattern = "Dark Cloud Cover"
+            sig = "SELL"
+            mod = 14
+        
+        # ========== Single candle ==========
+        # Hammer / Pin Bar Bullish (long lower wick)
+        elif lw > rng_c * 0.62 and body_c < rng_c * 0.3:
+            pattern = "Hammer / Pin Bar Bull"
+            sig = "BUY"
+            mod = 12
+        
+        # Shooting Star / Pin Bar Bearish (long upper wick)
+        elif uw > rng_c * 0.62 and body_c < rng_c * 0.3:
+            pattern = "Shooting Star / Pin Bar Bear"
+            sig = "SELL"
+            mod = 12
+        
+        # Strong bull body (close > open, body > 70% of range)
         elif cc > co and body_c > rng_c * 0.7:
             pattern = "Strong Bull"
             sig = "BUY"
@@ -93,14 +118,28 @@ def confirm(symbol, interval="15m", rows=None):
             sig = "WAIT"
             mod = -3
         
-        # ── Next candle forecast ──────────────────────
-        forecast = _forecast(rows, sig)
+        # Spinning Top (small body, moderate wicks)
+        elif body_c < rng_c * 0.3 and lw > rng_c * 0.2 and uw > rng_c * 0.2:
+            pattern = "Spinning Top"
+            sig = "WAIT"
+            mod = -1
+        
+        # ========== Forecast ==========
+        forecast = _forecast(rows, sig, pattern, mod)
+        
+        # Reason string
+        if sig == "BUY":
+            reason = f"{pattern} bullish"
+        elif sig == "SELL":
+            reason = f"{pattern} bearish"
+        else:
+            reason = f"{pattern} — indecision"
         
         return {
             "signal": sig,
             "score_mod": mod,
             "pattern": pattern,
-            "reason": pattern + (" bullish" if sig == "BUY" else " bearish" if sig == "SELL" else " — indecision"),
+            "reason": reason,
             "forecast": forecast,
         }
     
@@ -108,30 +147,55 @@ def confirm(symbol, interval="15m", rows=None):
         return _r("WAIT", 0, "Error", str(e)[:40], {})
 
 
-def _forecast(rows, current_signal):
-    """Next candle probability estimate"""
-    if len(rows) < 5:
+def _forecast(rows, current_signal, pattern, mod):
+    """
+    Next candle probability using more data.
+    - uses last 10 candles for trend
+    - adjusts by pattern strength
+    """
+    if len(rows) < 10:
         return {"up": 50, "down": 50, "flat": 0}
     
-    closes = [r["close"] for r in rows[-5:]]
-    ups = sum(1 for i in range(1, len(closes)) if closes[i] > closes[i - 1])
-    downs = sum(1 for i in range(1, len(closes)) if closes[i] < closes[i - 1])
+    closes = [r["close"] for r in rows[-10:]]
+    ups = sum(1 for i in range(1, len(closes)) if closes[i] > closes[i-1])
+    downs = sum(1 for i in range(1, len(closes)) if closes[i] < closes[i-1])
     total = len(closes) - 1
     
-    base_up = int(ups / total * 100) if total > 0 else 50
-    base_down = int(downs / total * 100) if total > 0 else 50
+    if total == 0:
+        base_up = 50
+        base_down = 50
+    else:
+        base_up = int(ups / total * 100)
+        base_down = int(downs / total * 100)
     
-    # Signal bias
+    # Adjust by pattern strength (mod)
     if current_signal == "BUY":
-        base_up = min(base_up + 18, 80)
-        base_down = max(base_down - 18, 10)
+        # Positive mod adds bias
+        base_up = min(base_up + (mod // 3), 85)
+        base_down = max(base_down - (mod // 3), 10)
     elif current_signal == "SELL":
-        base_down = min(base_down + 18, 80)
-        base_up = max(base_up - 18, 10)
+        base_down = min(base_down + (mod // 3), 85)
+        base_up = max(base_up - (mod // 3), 10)
     
-    flat = max(0, 100 - base_up - base_down)
+    # Ensure total sum is 100
+    total_bias = base_up + base_down
+    if total_bias > 100:
+        ratio = 100 / total_bias
+        base_up = int(base_up * ratio)
+        base_down = int(base_down * ratio)
+    elif total_bias < 100:
+        base_up += (100 - total_bias) // 2
+        base_down += (100 - total_bias) - (100 - total_bias)//2
+    
+    flat = 0
     return {"up": base_up, "down": base_down, "flat": flat}
 
 
 def _r(sig, mod, pattern, reason, forecast):
-    return {"signal": sig, "score_mod": mod, "pattern": pattern, "reason": reason, "forecast": forecast}
+    return {
+        "signal": sig,
+        "score_mod": mod,
+        "pattern": pattern,
+        "reason": reason,
+        "forecast": forecast
+    }
