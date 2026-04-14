@@ -1,0 +1,7 @@
+event_type	timestamp	price	quantity	side	total_liq_vol	recent_liq_vol	long_liq	short_liq	delta_liq_5m	magnet_levels	reversal_signal	oi_relation	retail_sentiment	oi_trend	price_trend
+analysis	1776181635218	0	0	0	0.00	0.00	0.00	0.00	0.00		NONE	NO_DATA	NEUTRAL	FLAT	FLAT
+raw	1776181640571	85.55	69.54	SELL	0	0	0	0	0						
+raw	1776181649655	85.54	82.71	SELL	0	0	0	0	0						
+raw	1776181653665	85.53	174.20	SELL	0	0	0	0	0						
+raw	1776181655371	85.56	165.42	SELL	0	0	0	0	0						
+raw	1776181657346	85.56	291.33	SELL	0	0	0	0	0						
