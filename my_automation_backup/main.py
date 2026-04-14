@@ -1,9 +1,12 @@
-# main.py
 import sys, json, os, gc
 from flask import Flask, request, jsonify, render_template_string, send_file
 from sys_data import SysData
 from pairs import get_pairs_by_market
 from config import HTML_TEMPLATE, MARKET_TIMEFRAMES
+
+import logging
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.ERROR)   # ya WARNING
 
 print("[Main] Starting...")
 app = Flask(__name__)
@@ -279,6 +282,7 @@ def file_info():
         except:
             return 0
     
+    # Existing file types
     candles_rows = count_rows(f"{clean.lower()}.tsv")
     cvd_rows = count_rows(f"{clean.lower()}_cvd.tsv")
     depth_rows = count_rows(f"{clean.lower()}_depth.tsv")
@@ -286,13 +290,29 @@ def file_info():
     correlation_rows = count_rows(f"{clean.lower()}_correlation.tsv")
     liquidations_rows = count_rows(f"{clean.lower()}_liquidations.tsv")
     
+    # New file types (added for UI buttons)
+    macro_rows = count_rows(f"{clean.lower()}_macro.tsv")
+    sessions_rows = count_rows(f"{clean.lower()}_sessions.tsv")
+    sentiment_rows = count_rows(f"{clean.lower()}_sentiment.tsv")
+    volProfile_rows = count_rows(f"{clean.lower()}_volProfile.tsv")
+    mstructure_rows = count_rows(f"{clean.lower()}_mstructure.tsv")
+    onchain_rows = count_rows(f"{clean.lower()}_onchain.tsv")
+    tick_rows = count_rows(f"{clean.lower()}_tick.tsv")
+    
     return jsonify({
         "candles": candles_rows,
         "cvd": cvd_rows,
         "depth": depth_rows,
         "derivative": derivative_rows,
         "correlation": correlation_rows,
-        "liquidations": liquidations_rows
+        "liquidations": liquidations_rows,
+        "macro": macro_rows,
+        "sessions": sessions_rows,
+        "sentiment": sentiment_rows,
+        "volProfile": volProfile_rows,
+        "mstructure": mstructure_rows,
+        "onchain": onchain_rows,
+        "tick": tick_rows
     })
 
 @app.route('/mem')
