@@ -1,4 +1,3 @@
-# sys_data.py
 import os
 import sys
 import time
@@ -24,6 +23,63 @@ from Groups.group_x.X08_derivative_ws import DerivativeWebSocket
 # Correlation modules
 from Groups.group_x.X09_correlation_rest import CorrelationRest
 from Groups.group_x.X10_correlation_ws import CorrelationWebSocket
+
+# Conditional imports for optional modules (may not exist yet)
+try:
+    from Groups.group_x.X11_macro_rest import MacroDataFetcher
+    X11_AVAILABLE = True
+except ImportError:
+    X11_AVAILABLE = False
+    print("[WARN] X11_macro_rest not available, macro data disabled")
+
+try:
+    from Groups.group_x.X13_liquidations_rest import LiquidationDataREST
+    X13_AVAILABLE = True
+except ImportError:
+    X13_AVAILABLE = False
+    print("[WARN] X13_liquidations_rest not available, liquidation data disabled")
+
+try:
+    from Groups.group_x.X15_session_rest import collect_and_save as session_collect
+    X15_AVAILABLE = True
+except ImportError:
+    X15_AVAILABLE = False
+    print("[WARN] X15_session_rest not available, session data disabled")
+
+try:
+    from Groups.group_x.X17_sentiment_rest import SentimentData
+    X17_AVAILABLE = True
+except ImportError:
+    X17_AVAILABLE = False
+    print("[WARN] X17_sentiment_rest not available, sentiment data disabled")
+
+try:
+    from Groups.group_x.X19_volProfile_rest import VolumeProfile
+    X19_AVAILABLE = True
+except ImportError:
+    X19_AVAILABLE = False
+    print("[WARN] X19_volProfile_rest not available, volume profile disabled")
+
+try:
+    from Groups.group_x.X21_mstructure_rest import MarketStructure
+    X21_AVAILABLE = True
+except ImportError:
+    X21_AVAILABLE = False
+    print("[WARN] X21_mstructure_rest not available, market structure disabled")
+
+try:
+    from Groups.group_x.X23_onchain_rest import collect_and_save as onchain_collect
+    X23_AVAILABLE = True
+except ImportError:
+    X23_AVAILABLE = False
+    print("[WARN] X23_onchain_rest not available, on‑chain data disabled")
+
+try:
+    from Groups.group_x.X25_tick_rest import collect_and_save as tick_collect
+    X25_AVAILABLE = True
+except ImportError:
+    X25_AVAILABLE = False
+    print("[WARN] X25_tick_rest not available, tick data disabled")
 
 print("[SysData] Loading...")
 
@@ -211,7 +267,6 @@ class RealHandler:
                 self.derivative_ws = DerivativeWebSocket(self.data_dir, self.derivative_rest, min_quantity=1.0)
                 self.derivative_ws.start(list(self.active_derivative_symbols))
             self.derivative_rest.collect_and_save(clean)
-            # Check main derivative file exists (indicating success)
             filepath = os.path.join(self.data_dir, "symbols", f"{clean.lower()}_derivative.tsv")
             if os.path.exists(filepath):
                 update_status(clean, 'derivative', True)
@@ -264,31 +319,218 @@ class RealHandler:
             traceback.print_exc()
             update_status(clean, 'correlation', False)
 
+    # ---------- Macro data (X11) ----------
+    def fetch_macro_data(self, symbol):
+        if not X11_AVAILABLE:
+            print("[Macro] X11 module not available, skipping", flush=True)
+            return
+        clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
+        # Delete old macro file first
+        filepath = os.path.join(self.data_dir, "symbols", f"{clean.lower()}_macro.tsv")
+        if os.path.exists(filepath):
+            os.remove(filepath)
+            print(f"[Macro] Deleted old file: {filepath}", flush=True)
+        print("[Macro] Starting macro data fetch (X11)", flush=True)
+        try:
+            fetcher = MacroDataFetcher()
+            fetcher.fetch_and_save_all(clean)  # saves to symbol_macro.tsv
+            # Check if file was created
+            if os.path.exists(filepath):
+                update_status(clean, 'macro', True)
+                print("[Macro] Macro data saved", flush=True)
+            else:
+                update_status(clean, 'macro', False)
+                print("[Macro] Failed to save macro data", flush=True)
+        except Exception as e:
+            print(f"[Macro] Error: {e}", flush=True)
+            traceback.print_exc()
+            update_status(clean, 'macro', False)
+
+    # ---------- X13 Liquidations ----------
+    def run_x13_liquidations(self, symbol):
+        if not X13_AVAILABLE:
+            print("[X13] Module not available, skipping", flush=True)
+            return
+        clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
+        filepath = os.path.join(self.data_dir, "symbols", f"{clean.lower()}_liquidations.tsv")
+        if os.path.exists(filepath):
+            os.remove(filepath)
+            print(f"[X13] Deleted old file: {filepath}", flush=True)
+        print("[X13] Starting liquidation data fetch", flush=True)
+        try:
+            liq = LiquidationDataREST()
+            liq.collect_and_save(clean)
+            if os.path.exists(filepath):
+                update_status(clean, 'liquidations', True)
+            else:
+                update_status(clean, 'liquidations', False)
+        except Exception as e:
+            print(f"[X13] Error: {e}", flush=True)
+            traceback.print_exc()
+            update_status(clean, 'liquidations', False)
+
+    # ---------- X15 Session ----------
+    def run_x15_session(self, symbol):
+        if not X15_AVAILABLE:
+            print("[X15] Module not available, skipping", flush=True)
+            return
+        clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
+        filepath = os.path.join(self.data_dir, "symbols", f"{clean.lower()}_sessions.tsv")
+        if os.path.exists(filepath):
+            os.remove(filepath)
+            print(f"[X15] Deleted old file: {filepath}", flush=True)
+        print("[X15] Starting session analysis", flush=True)
+        try:
+            session_collect(clean)
+            if os.path.exists(filepath):
+                update_status(clean, 'sessions', True)
+            else:
+                update_status(clean, 'sessions', False)
+        except Exception as e:
+            print(f"[X15] Error: {e}", flush=True)
+            traceback.print_exc()
+            update_status(clean, 'sessions', False)
+
+    # ---------- X17 Sentiment ----------
+    def run_x17_sentiment(self, symbol):
+        if not X17_AVAILABLE:
+            print("[X17] Module not available, skipping", flush=True)
+            return
+        clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
+        filepath = os.path.join(self.data_dir, "symbols", f"{clean.lower()}_sentiment.tsv")
+        if os.path.exists(filepath):
+            os.remove(filepath)
+            print(f"[X17] Deleted old file: {filepath}", flush=True)
+        print("[X17] Starting sentiment data fetch", flush=True)
+        try:
+            sent = SentimentData()
+            sent.collect_and_save(clean)
+            if os.path.exists(filepath):
+                update_status(clean, 'sentiment', True)
+            else:
+                update_status(clean, 'sentiment', False)
+        except Exception as e:
+            print(f"[X17] Error: {e}", flush=True)
+            traceback.print_exc()
+            update_status(clean, 'sentiment', False)
+
+    # ---------- X19 Volume Profile ----------
+    def run_x19_volprofile(self, symbol):
+        if not X19_AVAILABLE:
+            print("[X19] Module not available, skipping", flush=True)
+            return
+        clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
+        filepath = os.path.join(self.data_dir, "symbols", f"{clean.lower()}_volProfile.tsv")
+        if os.path.exists(filepath):
+            os.remove(filepath)
+            print(f"[X19] Deleted old file: {filepath}", flush=True)
+        print("[X19] Starting volume profile analysis", flush=True)
+        try:
+            vp = VolumeProfile()
+            vp.collect_and_save(clean)
+            if os.path.exists(filepath):
+                update_status(clean, 'volProfile', True)
+            else:
+                update_status(clean, 'volProfile', False)
+        except Exception as e:
+            print(f"[X19] Error: {e}", flush=True)
+            traceback.print_exc()
+            update_status(clean, 'volProfile', False)
+
+    # ---------- X21 Market Structure ----------
+    def run_x21_mstructure(self, symbol):
+        if not X21_AVAILABLE:
+            print("[X21] Module not available, skipping", flush=True)
+            return
+        clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
+        filepath = os.path.join(self.data_dir, "symbols", f"{clean.lower()}_mstructure.tsv")
+        if os.path.exists(filepath):
+            os.remove(filepath)
+            print(f"[X21] Deleted old file: {filepath}", flush=True)
+        print("[X21] Starting market structure analysis", flush=True)
+        try:
+            ms = MarketStructure()
+            ms.collect_and_save(clean)
+            if os.path.exists(filepath):
+                update_status(clean, 'mstructure', True)
+            else:
+                update_status(clean, 'mstructure', False)
+        except Exception as e:
+            print(f"[X21] Error: {e}", flush=True)
+            traceback.print_exc()
+            update_status(clean, 'mstructure', False)
+
+    # ---------- X23 On‑chain ----------
+    def run_x23_onchain(self, symbol):
+        if not X23_AVAILABLE:
+            print("[X23] Module not available, skipping", flush=True)
+            return
+        clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
+        filepath = os.path.join(self.data_dir, "symbols", f"{clean.lower()}_onchain.tsv")
+        if os.path.exists(filepath):
+            os.remove(filepath)
+            print(f"[X23] Deleted old file: {filepath}", flush=True)
+        print("[X23] Starting on‑chain data fetch", flush=True)
+        try:
+            onchain_collect(clean)
+            if os.path.exists(filepath):
+                update_status(clean, 'onchain', True)
+            else:
+                update_status(clean, 'onchain', False)
+        except Exception as e:
+            print(f"[X23] Error: {e}", flush=True)
+            traceback.print_exc()
+            update_status(clean, 'onchain', False)
+
+    # ---------- X25 Tick ----------
+    def run_x25_tick(self, symbol):
+        if not X25_AVAILABLE:
+            print("[X25] Module not available, skipping", flush=True)
+            return
+        clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
+        filepath = os.path.join(self.data_dir, "symbols", f"{clean.lower()}_tick.tsv")
+        if os.path.exists(filepath):
+            os.remove(filepath)
+            print(f"[X25] Deleted old file: {filepath}", flush=True)
+        print("[X25] Starting tick & volume profile fetch", flush=True)
+        try:
+            tick_collect(clean)
+            if os.path.exists(filepath):
+                update_status(clean, 'tick', True)
+            else:
+                update_status(clean, 'tick', False)
+        except Exception as e:
+            print(f"[X25] Error: {e}", flush=True)
+            traceback.print_exc()
+            update_status(clean, 'tick', False)
+
     # ---------- fill_single (parallel execution) ----------
     def fill_single(self, symbol, minutes=120):
         clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
         print(f"[Fill] Starting fill for {clean}", flush=True)
         if is_crypto_symbol(clean):
-            # 1. Candles (fast, sequential)
-            print("[Fill] Step 1: Candles", flush=True)
+            # 1. Candles using X01 (direct REST + WebSocket update)
+            print("[Fill] Step 1: Candles (via X01)", flush=True)
             try:
-                self.binance_rest.fill_gaps(clean, minutes=minutes)
-                candles = self.binance_rest.get_candles_for_symbol(clean)
-                if candles:
-                    self.binance_ws.add_candles(clean, candles)
-                    print(f"[Fill] Merged {len(candles)} candles for {clean}", flush=True)
-                candles_file = os.path.join(self.data_dir, "symbols", f"{clean.lower()}.tsv")
-                if os.path.exists(candles_file):
+                from Groups.group_x.X01_klines_rest import fetch_and_update_ws
+                success = fetch_and_update_ws(clean, self.binance_ws)
+                if success:
                     update_status(clean, 'candles', True)
+                    print(f"[Fill] Added 1m candles for {clean} to WebSocket", flush=True)
                 else:
                     update_status(clean, 'candles', False)
             except Exception as e:
-                print(f"[Fill] Candles error: {e}", flush=True)
+                print(f"[Fill] X01 error: {e}", flush=True)
                 traceback.print_exc()
                 update_status(clean, 'candles', False)
 
-            # 2. Depth (fast, sequential)
-            print("[Fill] Step 2: Depth", flush=True)
+            # 2. Macro data (X11) – background
+            print("[Fill] Step 2: Macro data (X11) in background", flush=True)
+            t_macro = threading.Thread(target=self.fetch_macro_data, args=(clean,), daemon=True)
+            t_macro.start()
+
+            # 3. Depth (fast, sequential)
+            print("[Fill] Step 3: Depth", flush=True)
             try:
                 from Groups.group_x.X06_depth_rest import fetch_depth_snapshot
                 snapshot = fetch_depth_snapshot(clean, limit=500)
@@ -314,8 +556,8 @@ class RealHandler:
                 traceback.print_exc()
                 update_status(clean, 'depth', False)
 
-            # 3. CVD, Derivative, Correlation in PARALLEL
-            print("[Fill] Step 3: Starting parallel tasks (CVD, Derivative, Correlation)", flush=True)
+            # 4. Start all remaining background threads (CVD, Derivative, Correlation, and optional X modules)
+            print("[Fill] Step 4: Starting all background tasks", flush=True)
             
             def run_cvd():
                 try:
@@ -344,13 +586,26 @@ class RealHandler:
             t_cvd = threading.Thread(target=run_cvd, daemon=True)
             t_deriv = threading.Thread(target=run_derivative, daemon=True)
             t_corr = threading.Thread(target=run_correlation, daemon=True)
+            t_x13 = threading.Thread(target=self.run_x13_liquidations, args=(clean,), daemon=True)
+            t_x15 = threading.Thread(target=self.run_x15_session, args=(clean,), daemon=True)
+            t_x17 = threading.Thread(target=self.run_x17_sentiment, args=(clean,), daemon=True)
+            t_x19 = threading.Thread(target=self.run_x19_volprofile, args=(clean,), daemon=True)
+            t_x21 = threading.Thread(target=self.run_x21_mstructure, args=(clean,), daemon=True)
+            t_x23 = threading.Thread(target=self.run_x23_onchain, args=(clean,), daemon=True)
+            t_x25 = threading.Thread(target=self.run_x25_tick, args=(clean,), daemon=True)
             
             t_cvd.start()
             t_deriv.start()
             t_corr.start()
+            t_x13.start()
+            t_x15.start()
+            t_x17.start()
+            t_x19.start()
+            t_x21.start()
+            t_x23.start()
+            t_x25.start()
             
-            print("[Fill] Parallel tasks started (CVD, Derivative, Correlation running in background)", flush=True)
-
+            print("[Fill] All background tasks started", flush=True)
         else:
             # Non-crypto – only candles
             print(f"[Fill] Non-crypto {clean}, only candles", flush=True)
@@ -372,7 +627,7 @@ class RealHandler:
             update_status(clean, 'derivative', True)
             update_status(clean, 'correlation', True)
         
-        print(f"[Fill] fill_single main thread finished (parallel tasks running in background)", flush=True)
+        print(f"[Fill] fill_single main thread finished (background tasks running)", flush=True)
 
     def get_candle_count(self, symbol):
         if not self._started:
@@ -601,7 +856,7 @@ class SysData:
             z_result = self.engine.get_z_score(symbol, market, interval, rows)
             a_result = self.engine.get_a_score(symbol, market, interval, rows, z_result)
             a_signal = a_result.get("a_signal", "WAIT")
-            a_result["requires_deep"] = a_result.get("requires_deep", a_signal != "WAIT")
+            a_result["requires_deep"] = False   # Group D removed
             a_result["forecast"] = a_result.get("forecast", {})
             a_result["z_score"] = z_result.get("score", "NA")
             a_result["regime"] = z_result.get("regime", "—")
@@ -610,17 +865,7 @@ class SysData:
         except Exception as e:
             return {"error": f"GO error: {str(e)}"}
 
-    def deep(self, symbol: str, market: str, a_result: dict, interval: str = "") -> dict:
-        if not interval:
-            interval = self._interval
-        try:
-            rows = self._get_rows(symbol, interval, 150)
-            if not rows or len(rows) < 20:
-                return {"error": "Not enough data for deep analysis"}
-            d_result = self.engine.get_d_score(symbol, market, interval, rows, a_result)
-            return d_result
-        except Exception as e:
-            return {"error": f"Deep error: {str(e)}"}
+    # deep() method removed – Group D no longer exists
 
     def get_current_scores(self) -> dict:
         with _score_lock:
