@@ -1,0 +1,18 @@
+# ========== CVD SUMMARY ==========
+timestamp	cumulative_cvd	cvd_delta	cvd_velocity	total_buy_vol	total_sell_vol	trade_count
+1776183055982	-302087.2899999998	-302087.2899999998	5461.91	1695845.4100000036	1997932.699999986	7250
+
+# ========== POINT OF CONTROL (PoC) ==========
+poc_price	poc_volume
+1.2	3693778.1099999896
+
+# ========== FOOTPRINT (price-level buy/sell, top 50, min_vol=5) ==========
+price	buy_vol	sell_vol
+1.2	1695845.4100000036	1997932.699999986
+
+# ========== IMBALANCE EVENTS (ratio>=3, volume>avg_trade*10, diff>avg_trade*5) ==========
+timestamp	price	ratio	type	volume	diff
+
+# ========== ABSORPTION EVENTS (CVD delta > 2*std of last 10 CVD values) ==========
+timestamp	price	cvd_delta	price_delta	type
+1776165113223	1.2	-302074.89	0.0	bearish
