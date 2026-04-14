@@ -1,4 +1,3 @@
-# config.py
 MARKET_TIMEFRAMES = {
     "Binary OTC": "5m",
     "CFD":        "5m",
@@ -11,119 +10,157 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <head>
 <meta charset='UTF-8'>
 <meta name='viewport' content='width=device-width,initial-scale=1'>
-<title>Signal Bot</title>
+<title>KALI PORT</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
-    background: #0d0d0d;
+    background: #000000;
     color: #ccc;
     font-family: 'Segoe UI', monospace, sans-serif;
     font-size: 12px;
     min-height: 100vh;
   }
 
-  /* ── Header ── */
-  .hdr {
-    background: linear-gradient(135deg,#111,#1a1a2e);
-    padding: 8px 16px;
+  /* ── Header container ── */
+  .header-container {
+    background: linear-gradient(135deg,#0a0a0a,#1a1a2e);
+    border-bottom: 1px solid #9AFFAB;
+    padding: 0 20px;
+  }
+  .logo-row {
+    padding: 10px 0 5px 0;
+    margin: 0;
+    text-align: left;
+  }
+  .logo-row h1 {
+    font-family: 'Orbitron', monospace;
+    font-weight: 900;
+    letter-spacing: 2px;
+    color: #FF6600;
+    font-size: 20px;
+    margin: 0;
+  }
+  .controls-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: stretch;
+    gap: 20px;
+    padding: 5px 0 10px 0;
+    flex-wrap: wrap;
+  }
+  .left-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: rgba(0,0,0,0.3);
+    padding: 6px 12px;
+    border-radius: 0;
+    flex: 1;
+  }
+  .top-controls {
     display: flex;
     align-items: center;
     gap: 10px;
-    border-bottom: 1px solid #222;
     flex-wrap: wrap;
   }
-  .hdr h1 {
-    color: #00cc66;
-    font-size: 15px;
-    letter-spacing: 1px;
-    margin-right: 8px;
+  .bottom-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
   }
-  .time-stats {
-    margin-left: auto;
+  .right-clocks {
     display: flex;
     flex-direction: column;
-    align-items: flex-end;
-    gap: 2px;
+    justify-content: center;
     background: rgba(0,0,0,0.3);
-    padding: 4px 8px;
-    border-radius: 6px;
+    padding: 4px 12px;
+    border-radius: 0;
+    border-left: 2px solid #9AFFAB;
+  }
+  .time-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
     font-size: 11px;
   }
   .time-stats div {
     display: flex;
-    gap: 6px;
-    line-height: 1.4;
+    gap: 8px;
+    justify-content: space-between;
   }
   .time-stats span {
-    color: #00cc66;
+    color: #9AFFAB;
     font-weight: bold;
     font-family: monospace;
-    font-size: 11px;
+    font-size: 12px;
   }
 
-  /* ── Controls ── */
+  /* ── Controls (form elements) ── */
   select, input[type=text], input[type=password] {
     background: #1a1a1a;
     color: #ccc;
     border: 1px solid #333;
-    border-radius: 5px;
-    padding: 5px 8px;
+    border-radius: 0;
+    padding: 4px 8px;
     font-size: 11px;
     outline: none;
   }
-  select:focus, input:focus { border-color: #00cc66; }
+  select:focus, input:focus { border-color: #9AFFAB; }
 
   .scan-btn {
-    background: linear-gradient(135deg,#004422,#006633);
-    color: #00ff88;
-    border: 1px solid #00cc66;
-    border-radius: 6px;
-    padding: 5px 14px;
-    font-size: 12px;
+    background: linear-gradient(135deg,#1a3a1a,#2a5a2a);
+    color: #9AFFAB;
+    border: 1px solid #9AFFAB;
+    border-radius: 0;
+    padding: 2px 10px;
+    font-size: 10px;
     font-weight: bold;
     cursor: pointer;
     transition: all 0.2s;
   }
-  .scan-btn:hover { background: #006633; }
+  .scan-btn:hover { background: #2a6a2a; transform: scale(1.02); }
   .scan-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-  /* ── Status bar ── */
-  #status-bar {
-    font-size: 10px;
-    color: #555;
-    padding: 4px 16px;
-    border-bottom: 1px solid #181818;
-    display: flex;
-    gap: 16px;
-    align-items: center;
-  }
-  #status-bar .dot {
-    width: 7px; height: 7px;
-    border-radius: 50%;
-    display: inline-block;
-    margin-right: 4px;
-  }
-  .dot-green  { background: #00cc66; }
-  .dot-red    { background: #ff4444; }
-  .dot-orange { background: #ffaa00; }
 
   /* ── IQ credentials panel ── */
   #iq-creds {
     display: none;
     background: #111;
     border: 1px solid #333;
-    border-radius: 6px;
-    padding: 6px 10px;
+    border-radius: 0;
+    padding: 4px 8px;
     gap: 6px;
     align-items: center;
     flex-wrap: wrap;
   }
   #iq-creds.visible { display: flex; }
 
+  /* ── Status bar ── */
+  #status-bar {
+    font-size: 10px;
+    color: #555;
+    padding: 4px 20px;
+    border-bottom: 1px solid #181818;
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    background: #0a0a0a;
+  }
+  #status-bar .dot {
+    width: 7px; height: 7px;
+    border-radius: 0;
+    display: inline-block;
+    margin-right: 4px;
+  }
+  .dot-green  { background: #9AFFAB; }
+  .dot-red    { background: #FF6352; }
+  .dot-orange { background: #FCDB66; }
+
   /* ── Main layout ── */
   #main-wrap {
     display: flex;
-    height: calc(100vh - 85px);
+    height: calc(100vh - 115px);
   }
   #pairs-panel {
     flex: 1;
@@ -150,7 +187,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .pair-card {
     background: #121212;
     border: 1px solid #252525;
-    border-radius: 8px;
+    border-radius: 0;
     padding: 8px 12px;
     cursor: grab;
     transition: all 0.1s;
@@ -158,7 +195,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .pair-card:active { cursor: grabbing; }
   .pair-card.dragging { opacity: 0.5; }
 
-  /* Card header (top row) */
   .card-header {
     display: flex;
     align-items: center;
@@ -171,50 +207,57 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     color: #777;
     cursor: grab;
   }
-  .drag-handle:active { cursor: grabbing; }
   .status-light {
-    font-size: 14px;
+    width: 14px;
+    height: 14px;
+    display: inline-block;
+    background: #FF6352;
     cursor: pointer;
   }
   .pair-name {
     font-weight: bold;
     font-size: 13px;
-    color: #00cc66;
+    color: #9AFFAB;
   }
   .score-badge {
     display: inline-block;
     padding: 1px 5px;
-    border-radius: 3px;
+    border-radius: 0;
     font-weight: bold;
     font-size: 11px;
   }
-  .score-high { background: rgba(0,204,102,0.15); color: #00cc66; }
-  .score-mid  { background: rgba(255,170,0,0.15);  color: #ffaa00; }
-  .score-low  { background: rgba(255,68,68,0.15);  color: #ff4444; }
+  .score-high { background: rgba(154,255,171,0.15); color: #9AFFAB; }
+  .score-mid  { background: rgba(252,219,102,0.15); color: #FCDB66; }
+  .score-low  { background: rgba(255,99,82,0.15); color: #FF6352; }
   .go-btn {
     background: #1a2a1a;
-    color: #00cc66;
+    color: #9AFFAB;
     border: 1px solid #2a4a2a;
-    border-radius: 4px;
+    border-radius: 0;
     padding: 2px 8px;
     cursor: pointer;
     font-size: 10px;
-    transition: all 0.15s;
     margin-left: auto;
   }
-  .go-btn:hover { background: #1e3a1e; border-color: #00cc66; }
+  .go-btn:hover { background: #1e3a1e; border-color: #9AFFAB; }
 
-  /* Action buttons row */
   .action-buttons {
     display: flex;
     gap: 8px;
     margin-top: 6px;
-    justify-content: flex-end;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+  .action-row {
+    margin-bottom: 4px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
   }
   .data-btn {
     background: #1a1a1a;
     border: 1px solid #333;
-    border-radius: 4px;
+    border-radius: 0;
     padding: 2px 8px;
     font-size: 9px;
     cursor: pointer;
@@ -223,14 +266,19 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   }
   .data-btn.available {
     background: #1a3a1a;
-    border-color: #00cc66;
-    color: #00cc66;
+    border-color: #9AFFAB;
+    color: #9AFFAB;
   }
   .data-btn:hover {
     background: #2a2a2a;
   }
+  .btn-percent {
+    font-size: 8px;
+    margin-left: 4px;
+    opacity: 0.9;
+    color: #FCDB66;
+  }
 
-  /* Card body (second row) */
   .card-body {
     display: flex;
     flex-wrap: wrap;
@@ -245,12 +293,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     align-items: center;
     gap: 4px;
   }
-  .signal {
-    font-weight: bold;
-  }
+  .signal { font-weight: bold; }
   .quality {
     padding: 1px 4px;
-    border-radius: 3px;
+    border-radius: 0;
     background: rgba(255,255,255,0.05);
   }
   .reason {
@@ -274,18 +320,17 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     width: 4px;
     height: 10px;
     background: #2a2a2a;
-    border-radius: 1px;
+    border-radius: 0;
   }
   .feel-pct {
     font-size: 9px;
-    color: #ffaa00;
+    color: #FCDB66;
   }
 
-  /* Detail panel */
   #detail-title {
     font-size: 13px;
     font-weight: bold;
-    color: #00cc66;
+    color: #9AFFAB;
     margin-bottom: 10px;
     display: flex;
     align-items: center;
@@ -294,85 +339,94 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   #close-panel {
     margin-left: auto;
     cursor: pointer;
-    color: #555;
+    color: #FF6352;
     font-size: 14px;
   }
-  #close-panel:hover { color: #ccc; }
+  #close-panel:hover { color: #FCDB66; }
 
-  /* Loading & placeholder */
   #loading {
     display: none;
     text-align: center;
     padding: 30px;
-    color: #444;
+    color: #9AFFAB;
     font-size: 13px;
   }
   #loading.visible { display: block; }
   .spinner {
     display: inline-block;
     width: 20px; height: 20px;
-    border: 2px solid #333;
-    border-top-color: #00cc66;
+    border: 2px solid #2a2a2a;
+    border-top-color: #9AFFAB;
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
     margin-right: 8px;
     vertical-align: middle;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
-  .err-msg { color: #ff4444; padding: 8px; font-size: 11px; }
+  .err-msg { color: #FF6352; padding: 8px; font-size: 11px; }
   #placeholder {
-    color: #333;
+    color: #9AFFAB;
     text-align: center;
     padding: 40px;
     font-size: 13px;
+    border: 1px dashed #9AFFAB;
   }
   ::-webkit-scrollbar { width: 5px; }
   ::-webkit-scrollbar-track { background: #0d0d0d; }
-  ::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb { background: #9AFFAB; border-radius: 0; }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 </head>
 <body>
 
-<!-- Header -->
-<div class='hdr'>
-  <h1>⚡ Signal Bot</h1>
-  <select id='src-sel' onchange='onSrcChange()' title='Data Platform'>
-    <option value='real'>🌐 Real</option>
-    <option value='iqoption'>📊 IQ Option</option>
-    <option value='quotex'>📈 Quotex</option>
-  </select>
-  <div id='iq-creds'>
-    <input type='text'     id='iq-email' placeholder='IQ Email'    style='width:140px;'>
-    <input type='password' id='iq-pwd'   placeholder='IQ Password' style='width:110px;'>
+<div class="header-container">
+  <div class="logo-row">
+    <h1>⚡ KALI PORT 💱</h1>
   </div>
-  <select id='mkt-sel' title='Market Type'>
-    <!-- MARKET_OPTIONS -->
-  </select>
-  <select id='tf-sel' title='Timeframe'>
-    <option value='1m'>1m</option>
-    <option value='2m'>2m</option>
-    <option value='5m' selected>5m</option>
-    <option value='10m'>10m</option>
-    <option value='15m'>15m</option>
-    <option value='1h'>1h</option>
-    <option value='4h'>4h</option>
-  </select>
-  <button class='scan-btn' id='scan-btn' onclick='doScan()'>⟳ SCAN</button>
-  <div class='time-stats'>
-    <div>🕒 Clock: <span id='current-time'>--:--:--</span></div>
-    <div>⏱️ Uptime: <span id='stopwatch'>00:00:00.000</span></div>
+  <div class="controls-row">
+    <div class="left-controls">
+      <div class="top-controls">
+        <select id='src-sel' onchange='onSrcChange()' title='Data Platform'>
+          <option value='real'>🌐 Real</option>
+          <option value='iqoption'>📊 IQ Option</option>
+          <option value='quotex'>📈 Quotex</option>
+        </select>
+        <div id='iq-creds'>
+          <input type='text' id='iq-email' placeholder='IQ Email' style='width:120px;'>
+          <input type='password' id='iq-pwd' placeholder='IQ Password' style='width:100px;'>
+        </div>
+        <select id='tf-sel' title='Timeframe'>
+          <option value='1m'>1m</option>
+          <option value='2m'>2m</option>
+          <option value='5m' selected>5m</option>
+          <option value='10m'>10m</option>
+          <option value='15m'>15m</option>
+          <option value='1h'>1h</option>
+          <option value='4h'>4h</option>
+        </select>
+      </div>
+      <div class="bottom-controls">
+        <select id='mkt-sel' title='Market Type'>
+          <!-- MARKET_OPTIONS -->
+        </select>
+        <button class='scan-btn' id='scan-btn' onclick='doScan()'>⟳ SCAN</button>
+      </div>
+    </div>
+    <div class="right-clocks">
+      <div class='time-stats'>
+        <div>🕒 <span id='current-time'>--:--:--</span></div>
+        <div>⏱️ <span id='stopwatch'>00:00:00.000</span></div>
+      </div>
+    </div>
   </div>
 </div>
 
-<!-- Status bar -->
 <div id='status-bar'>
   <span><span class='dot dot-red' id='ws-dot'></span><span id='ws-status'>Not connected</span></span>
   <span id='call-stats'></span>
   <span id='pair-count'></span>
 </div>
 
-<!-- Main content -->
 <div id='main-wrap'>
   <div id='pairs-panel'>
     <div id='loading'><span class='spinner'></span> Scanning pairs…</div>
@@ -427,7 +481,7 @@ function onSrcChange() {
   iqDiv.classList.toggle('visible', _src === 'iqoption');
 }
 
-// Helper to copy data to clipboard (no new tab)
+// Copy single data file to clipboard
 async function copyData(symbol, type) {
   const url = `/data/${symbol}/${type}`;
   try {
@@ -445,6 +499,33 @@ async function copyData(symbol, type) {
   }
 }
 
+// Master copy: copy all available data files for a symbol
+async function copyAllData(symbol) {
+  const types = ['candles', 'cvd', 'correlation', 'derivative', 'depth', 'liquidations', 
+                 'macro', 'sessions', 'sentiment', 'volProfile', 'mstructure', 'onchain', 'tick'];
+  let allContent = '';
+  for (const type of types) {
+    const url = `/data/${symbol}/${type}`;
+    try {
+      const response = await fetch(url);
+      if (response.ok) {
+        const text = await response.text();
+        allContent += `========== ${type.toUpperCase()} ==========\\n${text}\\n\\n`;
+      } else {
+        allContent += `========== ${type.toUpperCase()} ==========\\nFile not available\\n\\n`;
+      }
+    } catch(e) {
+      allContent += `========== ${type.toUpperCase()} ==========\\nError fetching\\n\\n`;
+    }
+  }
+  if (allContent) {
+    await navigator.clipboard.writeText(allContent);
+    alert(`✅ Master copy for ${symbol} copied to clipboard!`);
+  } else {
+    alert(`❌ No data available for ${symbol}`);
+  }
+}
+
 function escapeHtml(str) {
   if (!str) return '';
   return str.replace(/[&<>]/g, function(m) {
@@ -453,6 +534,45 @@ function escapeHtml(str) {
     if (m === '>') return '&gt;';
     return m;
   });
+}
+
+// Update button percentages based on fill status (existing modules) and file checks for new modules
+async function updatePercentages(symbol, card) {
+  try {
+    // First get fill_status for existing modules
+    const statusResp = await fetch(`/fill_status?symbol=${encodeURIComponent(symbol)}`);
+    const status = await statusResp.json();
+    const existingTypes = ['cvd', 'correlation', 'derivative', 'depth', 'candles', 'liquidations'];
+    for (const type of existingTypes) {
+      const btn = card.querySelector(`.data-btn.${type}`);
+      if (btn) {
+        let percent = 0;
+        if (type === 'liquidations') {
+          if (status['derivative'] === true) percent = 100;
+        } else {
+          if (status[type] === true) percent = 100;
+        }
+        const label = type === 'liquidations' ? 'LIQ' : type.toUpperCase();
+        btn.innerHTML = `${label} <span class='btn-percent'>${percent}%</span>`;
+      }
+    }
+    // For new modules, check file existence via /check_file endpoint
+    const newTypes = ['macro', 'sessions', 'sentiment', 'volProfile', 'mstructure', 'onchain', 'tick'];
+    for (const type of newTypes) {
+      const btn = card.querySelector(`.data-btn.${type}`);
+      if (btn) {
+        const checkResp = await fetch(`/check_file?symbol=${encodeURIComponent(symbol)}&type=${type}`);
+        const check = await checkResp.json();
+        const exists = check.exists === true;
+        btn.classList.toggle('available', exists);
+        const percent = exists ? 100 : 0;
+        const label = type === 'volProfile' ? 'VOLP' : type.toUpperCase();
+        btn.innerHTML = `${label} <span class='btn-percent'>${percent}%</span>`;
+      }
+    }
+  } catch(e) {
+    console.warn("Failed to fetch file status:", e);
+  }
 }
 
 // Build cards from initial scan HTML
@@ -480,30 +600,44 @@ function buildCards(originalTbody) {
     card.className = 'pair-card';
     card.setAttribute('data-pair', pairName);
     
-    // Header
+    var statusPlaceholder = `<span class='status-light' style='background:#FF6352;' onclick="fillSymbol('${escapeHtml(pairName)}')"></span>`;
+    
     var header = document.createElement('div');
     header.className = 'card-header';
     header.innerHTML = `
       <span class='drag-handle'>${dragHandleHtml}</span>
-      <span class='status-light' onclick="fillSymbol('${escapeHtml(pairName)}')">${statusHtml}</span>
+      ${statusPlaceholder}
       <span class='pair-name'>${escapeHtml(pairName)}</span>
       <span class='score-badge'>${scoreHtml}</span>
       <button class='go-btn' onclick="doGO('${_mkt}','${escapeHtml(pairName)}','${_tf}')">→</button>
     `;
     
-    // Action buttons row - using copyData instead of viewData
-    var actionRow = document.createElement('div');
-    actionRow.className = 'action-buttons';
-    actionRow.innerHTML = `
-      <button class='data-btn cvd' onclick="copyData('${escapeHtml(pairName)}','cvd')">CVD</button>
-      <button class='data-btn correlation' onclick="copyData('${escapeHtml(pairName)}','correlation')">CORR</button>
-      <button class='data-btn derivative' onclick="copyData('${escapeHtml(pairName)}','derivative')">DERIV</button>
-      <button class='data-btn liquidations' onclick="copyData('${escapeHtml(pairName)}','liquidations')">LIQ</button>
-      <button class='data-btn depth' onclick="copyData('${escapeHtml(pairName)}','depth')">DEPTH</button>
-      <button class='data-btn candles' onclick="copyData('${escapeHtml(pairName)}','candles')">CANDLES</button>
+    // First action row: existing modules
+    var actionRow1 = document.createElement('div');
+    actionRow1.className = 'action-row';
+    actionRow1.innerHTML = `
+      <button class='data-btn cvd' onclick="copyData('${escapeHtml(pairName)}','cvd')">CVD <span class='btn-percent'>0%</span></button>
+      <button class='data-btn correlation' onclick="copyData('${escapeHtml(pairName)}','correlation')">CORR <span class='btn-percent'>0%</span></button>
+      <button class='data-btn derivative' onclick="copyData('${escapeHtml(pairName)}','derivative')">DERIV <span class='btn-percent'>0%</span></button>
+      <button class='data-btn liquidations' onclick="copyData('${escapeHtml(pairName)}','liquidations')">LIQ <span class='btn-percent'>0%</span></button>
+      <button class='data-btn depth' onclick="copyData('${escapeHtml(pairName)}','depth')">DEPTH <span class='btn-percent'>0%</span></button>
+      <button class='data-btn candles' onclick="copyData('${escapeHtml(pairName)}','candles')">CANDLES <span class='btn-percent'>0%</span></button>
+      <button class='data-btn master' onclick="copyAllData('${escapeHtml(pairName)}')" style="background:#2a0a2a; border-color:#FF6600; color:#FF6600;">MASTER</button>
     `;
     
-    // Body
+    // Second action row: new modules (macro, sessions, sentiment, volProfile, mstructure, onchain, tick)
+    var actionRow2 = document.createElement('div');
+    actionRow2.className = 'action-row';
+    actionRow2.innerHTML = `
+      <button class='data-btn macro' onclick="copyData('${escapeHtml(pairName)}','macro')">MACRO <span class='btn-percent'>0%</span></button>
+      <button class='data-btn sessions' onclick="copyData('${escapeHtml(pairName)}','sessions')">SESS <span class='btn-percent'>0%</span></button>
+      <button class='data-btn sentiment' onclick="copyData('${escapeHtml(pairName)}','sentiment')">SENT <span class='btn-percent'>0%</span></button>
+      <button class='data-btn volProfile' onclick="copyData('${escapeHtml(pairName)}','volProfile')">VOLP <span class='btn-percent'>0%</span></button>
+      <button class='data-btn mstructure' onclick="copyData('${escapeHtml(pairName)}','mstructure')">MSTR <span class='btn-percent'>0%</span></button>
+      <button class='data-btn onchain' onclick="copyData('${escapeHtml(pairName)}','onchain')">ONCH <span class='btn-percent'>0%</span></button>
+      <button class='data-btn tick' onclick="copyData('${escapeHtml(pairName)}','tick')">TICK <span class='btn-percent'>0%</span></button>
+    `;
+    
     var body = document.createElement('div');
     body.className = 'card-body';
     body.innerHTML = `
@@ -516,14 +650,17 @@ function buildCards(originalTbody) {
     `;
     
     card.appendChild(header);
-    card.appendChild(actionRow);
+    card.appendChild(actionRow1);
+    card.appendChild(actionRow2);
     card.appendChild(body);
     container.appendChild(card);
+    
+    updatePercentages(pairName, card);
   }
   return container;
 }
 
-// ── Refresh cards using lightweight /refresh endpoint ─────────────────────
+// Refresh cards using /refresh endpoint and update percentages
 async function refreshCards() {
   if (!_mkt) return;
   try {
@@ -536,19 +673,17 @@ async function refreshCards() {
       var data = scores[pair];
       if (!data) continue;
       
-      // Update score badge
       var scoreSpan = card.querySelector('.score-badge');
       if (scoreSpan) {
         var score = data.score;
         if (score === "NA") {
-          scoreSpan.innerHTML = "<span class='sb sl'>NA</span>";
+          scoreSpan.innerHTML = "<span class='score-low'>NA</span>";
         } else {
-          var bc = (score >= 65) ? "sh" : (score >= 40) ? "sm" : "sl";
-          scoreSpan.innerHTML = `<span class='sb ${bc}'>${score}%</span>`;
+          var cls = (score >= 65) ? "score-high" : (score >= 40) ? "score-mid" : "score-low";
+          scoreSpan.innerHTML = `<span class='${cls}'>${score}%</span>`;
         }
       }
       
-      // Update trend
       var trendDiv = card.querySelector('.trend');
       if (trendDiv) {
         var trend = data.trend || "FLAT";
@@ -556,27 +691,23 @@ async function refreshCards() {
         trendDiv.innerHTML = `${trendIcon} ${trend}`;
       }
       
-      // Update SR position
       var srDiv = card.querySelector('.sr');
       if (srDiv) srDiv.innerHTML = data.sr_position || "—";
       
-      // Update signal
       var signalDiv = card.querySelector('.signal');
       if (signalDiv) {
         var signal = data.signal || "WAIT";
-        var signalColor = {"STRONG BUY":"#00ff88","BUY":"#00ff88","SELL":"#ff6666","STRONG SELL":"#ff4444","WAIT":"#ffcc44"}[signal] || "#ffcc44";
+        var signalColor = {"STRONG BUY":"#9AFFAB","BUY":"#9AFFAB","SELL":"#FF6352","STRONG SELL":"#FF6352","WAIT":"#FCDB66"}[signal] || "#FCDB66";
         signalDiv.innerHTML = `<span style="color:${signalColor};">${signal}</span>`;
       }
       
-      // Update quality
       var qualityDiv = card.querySelector('.quality');
       if (qualityDiv) {
         var quality = data.quality || "LOW";
-        var qc = {"HIGH":"#00cc66","MED":"#ffaa00","LOW":"#ff4444"}[quality] || "#888";
+        var qc = {"HIGH":"#9AFFAB","MED":"#FCDB66","LOW":"#FF6352"}[quality] || "#888";
         qualityDiv.innerHTML = `<span style="font-size:9px;padding:1px 4px;border-radius:3px;background:${qc}22;border:1px solid ${qc}66;color:${qc};">${quality}</span>`;
       }
       
-      // Update reason
       var reasonDiv = card.querySelector('.reason');
       if (reasonDiv) {
         var reason = data.reason || "";
@@ -584,16 +715,15 @@ async function refreshCards() {
         reasonDiv.setAttribute('title', reason);
       }
       
-      // Update feel bar and status light
       var feelPct = data.feel_pct || 0;
       var feelBarDiv = card.querySelector('.feel-bar');
       if (feelBarDiv) {
         var steps = Math.round(feelPct / 5);
-        var color = feelPct >= 40 ? '#00cc66' : (feelPct >= 5 ? '#ffaa00' : '#ff4444');
+        var color = feelPct >= 40 ? '#9AFFAB' : (feelPct >= 5 ? '#FCDB66' : '#FF6352');
         var blocks = "";
         for (var j = 0; j < 20; j++) {
           var bg = j < steps ? color : '#2a2a2a';
-          blocks += `<div style='width:4px;height:10px;background:${bg};border-radius:1px;margin-right:1px;display:inline-block;'></div>`;
+          blocks += `<div style='width:4px;height:10px;background:${bg};border-radius:0;margin-right:1px;display:inline-block;'></div>`;
         }
         feelBarDiv.innerHTML = `<div style='display:flex;flex-direction:column;align-items:center;gap:2px;'>
           <div style='display:flex;align-items:center;' class='feel-blocks'>${blocks}</div>
@@ -601,12 +731,13 @@ async function refreshCards() {
         </div>`;
       }
       
-      // Update status light emoji (🔴/🟡/🟢)
       var statusSpan = card.querySelector('.status-light');
       if (statusSpan) {
-        var emoji = feelPct == 0 ? '🔴' : (feelPct < 100 ? '🟡' : '🟢');
-        statusSpan.innerHTML = emoji;
+        var bgColor = feelPct == 0 ? '#FF6352' : (feelPct < 100 ? '#FCDB66' : '#9AFFAB');
+        statusSpan.style.background = bgColor;
       }
+      
+      updatePercentages(pair, card);
     }
   } catch(e) {
     console.warn("Refresh failed:", e);
@@ -660,7 +791,6 @@ function doScan() {
         });
         restoreOrder();
         
-        // Start auto-refresh every 500ms
         if (refreshInterval) clearInterval(refreshInterval);
         refreshInterval = setInterval(refreshCards, 500);
         
@@ -698,7 +828,7 @@ function restoreOrder() {
 
 function doGO(market, pair, tf) {
   document.getElementById('detail-pair').textContent = pair;
-  document.getElementById('detail-body').innerHTML = "<div style='text-align:center;padding:20px;color:#444;'><span class='spinner'></span> Running A-layer…</div>";
+  document.getElementById('detail-body').innerHTML = "<div style='text-align:center;padding:20px;color:#9AFFAB;'><span class='spinner'></span> Running A-layer…</div>";
   document.getElementById('detail-panel').classList.add('open');
   fetch('/go?market=' + encodeURIComponent(market) + '&pair=' + encodeURIComponent(pair) + '&tf=' + encodeURIComponent(tf))
     .then(r => r.text())
@@ -707,7 +837,7 @@ function doGO(market, pair, tf) {
 }
 
 function doDeep(market, pair, tf, aResultJson) {
-  document.getElementById('detail-body').innerHTML += "<div style='text-align:center;padding:12px;color:#444;'><span class='spinner'></span> Running D-layer…</div>";
+  document.getElementById('detail-body').innerHTML += "<div style='text-align:center;padding:12px;color:#9AFFAB;'><span class='spinner'></span> Running D-layer…</div>";
   fetch('/deep?market=' + encodeURIComponent(market) + '&pair=' + encodeURIComponent(pair) + '&tf=' + encodeURIComponent(tf) + '&a_result=' + encodeURIComponent(aResultJson))
     .then(r => r.text())
     .then(html => {
@@ -743,18 +873,17 @@ function updateCallStats() {
     .catch(() => {});
 }
 
-// fillSymbol – polls /fill_status every second and updates buttons
 function fillSymbol(pair) {
   var card = document.querySelector('.pair-card[data-pair="' + pair.replace(/"/g, '&quot;') + '"]');
   if (!card) return;
   var statusSpan = card.querySelector('.status-light');
   if (statusSpan) {
-    statusSpan.innerHTML = '🟡';
+    statusSpan.style.background = '#FCDB66';
     statusSpan.style.cursor = 'wait';
   }
   
-  // Disable all data buttons and show loading state
-  var btnTypes = ['cvd', 'correlation', 'derivative', 'depth', 'candles', 'liquidations'];
+  var btnTypes = ['cvd', 'correlation', 'derivative', 'depth', 'candles', 'liquidations', 
+                  'macro', 'sessions', 'sentiment', 'volProfile', 'mstructure', 'onchain', 'tick', 'master'];
   for (var i = 0; i < btnTypes.length; i++) {
     var btn = card.querySelector('.data-btn.' + btnTypes[i]);
     if (btn) {
@@ -783,6 +912,21 @@ function fillSymbol(pair) {
                     } else {
                       allDone = false;
                     }
+                  } else if (comp === 'master') {
+                    btn.style.opacity = '1';
+                  } else if (comp === 'macro' || comp === 'sessions' || comp === 'sentiment' ||
+                             comp === 'volProfile' || comp === 'mstructure' || comp === 'onchain' || comp === 'tick') {
+                    // For new modules, check file existence via /check_file
+                    fetch(`/check_file?symbol=${encodeURIComponent(pair)}&type=${comp}`)
+                      .then(r => r.json())
+                      .then(check => {
+                        if (check.exists) {
+                          btn.classList.add('available');
+                          btn.style.opacity = '1';
+                        } else {
+                          allDone = false;
+                        }
+                      });
                   } else {
                     if (status[comp] === true) {
                       btn.classList.add('available');
@@ -793,6 +937,7 @@ function fillSymbol(pair) {
                   }
                 }
               }
+              updatePercentages(pair, card);
               if (allDone) {
                 clearInterval(pollInterval);
                 if (statusSpan) statusSpan.style.cursor = 'pointer';
@@ -803,12 +948,12 @@ function fillSymbol(pair) {
         }, 1000);
       } else {
         alert('Fill failed: ' + (data.error || 'Unknown error'));
-        if (statusSpan) statusSpan.innerHTML = '🔴';
+        if (statusSpan) statusSpan.style.background = '#FF6352';
       }
     })
     .catch(e => {
       alert('Error: ' + e);
-      if (statusSpan) statusSpan.innerHTML = '🔴';
+      if (statusSpan) statusSpan.style.background = '#FF6352';
     });
 }
 
@@ -820,4 +965,4 @@ document.getElementById('mkt-sel').addEventListener('change', function() {
 </body>
 </html>"""
 
-print("✅ [config] Loaded OK")
+print("✅ [config] Loaded OK - KALI PORT with #9AFFAB green, Master Copy button added")
