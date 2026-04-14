@@ -1,0 +1,2 @@
+timestamp	spot_price	mark_price	funding_rate	oi_current	oi_change_2h_pct	oi_trend	ls_ratio	long_pct	short_pct	arb_basis_pct	annualized_return	liquidations_count	latest_liq_price	latest_liq_qty
+1776183070349	1.177	1.17272005	-0.00154745	44850033.7	1.5903	neutral	1.97	0.6633	0.3367	-0.3636	-169.45	0	0	0
