@@ -1,57 +1,43 @@
 # data_sources/binance_rest.py
-import requests
-import time
+"""
+Binance REST Manager – coordinates other modules but does NOT fetch klines.
+Kline fetching is handled by X01_klines_rest.py (SQLite).
+"""
+
+import os
+
+_BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA_DIR = os.path.join(_BASE, "market_data", "binance")
 
 class BinanceREST:
-    """
-    Passive REST API client for Binance.
-    Used only when explicitly called (e.g., for backtesting).
-    """
-    
+    _total_calls = 0
+
     def __init__(self):
-        self.base_url = "https://api.binance.com/api/v3"
-        print("[BinanceREST] Initialized (passive)")
-    
-    def get_klines(self, symbol: str, interval: str = "5m", limit: int = 100):
-        """
-        Fetch historical candlestick data.
-        Returns list of dicts with keys: timestamp, open, high, low, close, volume.
-        """
-        endpoint = f"{self.base_url}/klines"
-        params = {
-            "symbol": symbol.upper(),
-            "interval": interval,
-            "limit": limit
-        }
-        try:
-            response = requests.get(endpoint, params=params, timeout=10)
-            response.raise_for_status()
-            data = response.json()
-            
-            klines = []
-            for candle in data:
-                klines.append({
-                    "timestamp": candle[0],          # open time in ms
-                    "open": float(candle[1]),
-                    "high": float(candle[2]),
-                    "low": float(candle[3]),
-                    "close": float(candle[4]),
-                    "volume": float(candle[5])
-                })
-            return klines
-        except Exception as e:
-            print(f"[BinanceREST] Error fetching klines: {e}")
-            return []
-    
-    def get_price(self, symbol: str):
-        """Get current price (optional, but could be used)."""
-        endpoint = f"{self.base_url}/ticker/price"
-        params = {"symbol": symbol.upper()}
-        try:
-            response = requests.get(endpoint, params=params, timeout=5)
-            response.raise_for_status()
-            data = response.json()
-            return float(data["price"])
-        except Exception as e:
-            print(f"[BinanceREST] Error getting price: {e}")
-            return None
+        os.makedirs(DATA_DIR, exist_ok=True)
+        self.symbols_dir = os.path.join(DATA_DIR, "symbols")
+        os.makedirs(self.symbols_dir, exist_ok=True)
+        print("✅ [BinanceREST] Initialized (manager mode – no kline fetching)")
+
+    # ========== Dummy methods for compatibility (no kline handling) ==========
+    def needs_fill(self, symbol, minutes=120):
+        """Dummy – always returns False. Kline filling is done by X01."""
+        return False
+
+    def fill_gaps(self, symbol, minutes=120):
+        """Dummy – does nothing. Use X01_klines_rest.py for fetching klines."""
+        print(f"[BinanceREST] fill_gaps called for {symbol} but disabled (use X01)")
+
+    def get_candles_for_symbol(self, symbol):
+        """Dummy – returns empty list. Use X01 SQLite database."""
+        return []
+
+    # ========== API call tracking (kept for compatibility) ==========
+    @classmethod
+    def get_total_calls(cls):
+        return cls._total_calls
+
+    @classmethod
+    def reset_calls(cls):
+        cls._total_calls = 0
+
+print("✅ [binance_rest] Module loaded (manager only)")
