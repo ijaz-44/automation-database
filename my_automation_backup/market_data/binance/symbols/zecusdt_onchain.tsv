@@ -1,0 +1,11 @@
+# ========== EXCHANGE INFLOW/OUTFLOW (1h, last 120 candles) ==========
+timestamp	inflow_usd	outflow_usd	netflow_usd
+NO_DATA	0	0	0
+
+# ========== WHALE WALLET MOVEMENTS (1h, last 120 candles) ==========
+timestamp	whale_inflow_usd	whale_outflow_usd	whale_netflow_usd
+NO_DATA	0	0	0
+
+# ========== USDT/USDC EXCHANGE FLOW (1h, last 120 candles) ==========
+timestamp	inflow_usd	outflow_usd	netflow_usd
+NO_DATA	0	0	0
