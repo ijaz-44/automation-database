@@ -11,8 +11,7 @@ GROUPS_DIR = os.path.join(BASE_DIR, "Groups")
 
 for p in [BASE_DIR,
           os.path.join(GROUPS_DIR, "group_z"),
-          os.path.join(GROUPS_DIR, "group_a"),
-          os.path.join(GROUPS_DIR, "group_d")]:
+          os.path.join(GROUPS_DIR, "group_a")]:
     if p not in sys.path:
         sys.path.insert(0, p)
 
@@ -39,83 +38,46 @@ except Exception as e:
     _a_ok = False
     print(f"❌ [engine] A modules: {e}")
 
-# Group D (optional)
+# Import config manager
 try:
-    sys.path.insert(0, os.path.join(GROUPS_DIR, "group_d"))
-    from D01_deep_volume    import analyze as d01_analyze
-    from D02_deep_structure import analyze as d02_analyze
-    from D03_deep_indicators import analyze as d03_analyze
-    _d_ok = True
-    print("✅ [engine] D modules loaded")
+    from Groups.group_c.config_manager import get_config_loader
+    _config_available = True
 except Exception as e:
-    _d_ok = False
-    print(f"❌ [engine] D modules: {e}")
+    _config_available = False
+    print(f"❌ [engine] Config loader: {e}")
 
 _signal_history: Dict[str, deque] = {}
 FLICKER_WINDOW = 3
 
-# ===================== DEFAULT CONFIGURATIONS (No JSON files) =====================
-def _get_default_config(market: str, interval: str) -> Dict[str, Any]:
-    """Return default configuration based on market and interval."""
-    # Base config (works for most markets)
-    base = {
-        "weights_z": {"trend": 0.35, "volume": 0.20, "momentum": 0.45},
-        "weights_a": {"structure": 0.30, "indicators": 0.30, "sr": 0.20, "candle": 0.20},
-        "thresholds_z": {"buy": 65, "sell": 35, "strong_buy": 80, "strong_sell": 20},
-        "thresholds_a": {"go": 70, "strong_buy": 85, "strong_sell": 15},
-        "min_z_for_a": 55,
-        "min_a_score": 65,
-        "risk": {"sl_atr_mult": 1.5, "tp_atr_mult": 2.0},
-        "deep": {"min_deep_score": 60, "require_deep_confirm": False},
-        "manipulation": {"enabled": False, "penalty": -20, "min_wick_ratio": 0.6, "volume_spike_threshold": 2.5}
-    }
-    
-    # Adjust for Binary OTC (more conservative, requires higher confidence)
-    if market == "Binary OTC":
-        base["thresholds_z"]["buy"] = 72
-        base["thresholds_z"]["sell"] = 28
-        base["thresholds_z"]["strong_buy"] = 85
-        base["thresholds_z"]["strong_sell"] = 15
-        base["thresholds_a"]["go"] = 75
-        base["thresholds_a"]["strong_buy"] = 88
-        base["thresholds_a"]["strong_sell"] = 12
-        base["min_z_for_a"] = 60
-        base["min_a_score"] = 70
-        base["deep"]["min_deep_score"] = 65
-        base["deep"]["require_deep_confirm"] = True
-        base["manipulation"]["enabled"] = True
-    
-    # Adjust for longer timeframes (more weight on trend, less on momentum)
-    if interval in ["15m", "30m", "1h", "4h"]:
-        base["weights_z"]["trend"] = 0.45
-        base["weights_z"]["momentum"] = 0.30
-        base["weights_a"]["structure"] = 0.40
-        base["weights_a"]["candle"] = 0.10
-    
-    # Adjust for very short timeframes (more weight on momentum)
-    if interval == "1m":
-        base["weights_z"]["momentum"] = 0.60
-        base["weights_z"]["trend"] = 0.20
-        base["weights_a"]["candle"] = 0.35
-        base["weights_a"]["indicators"] = 0.25
-    
-    return base
-
-
 class TradingEngine:
     def __init__(self):
-        # No config loader – using defaults
-        print("✅ [engine] Ready (using default configs, no JSON files)")
+        self.config_loader = None
+        if _config_available:
+            try:
+                self.config_loader = get_config_loader()
+                print("✅ [engine] Config loader connected")
+            except Exception as e:
+                print(f"[engine] Config loader init error: {e}")
+        else:
+            print("[engine] Config loader not available - using defaults")
+        print("✅ [engine] Ready (using config_manager)")
 
     def get_z_score(self, symbol: str, market: str, interval: str, rows: List) -> Dict[str, Any]:
         try:
             if not rows or len(rows) < 20:
                 return self._na("Insufficient data")
             
-            cfg = _get_default_config(market, interval)
-            weights_z = cfg.get("weights_z", {})
-            thresholds_z = cfg.get("thresholds_z", {})
-            manip_cfg = cfg.get("manipulation", {})
+            # Get config from manager (or fallback defaults)
+            if self.config_loader:
+                cfg = self.config_loader.get(symbol, market, interval)
+                weights_z = cfg.get("weights_z", {})
+                thresholds_z = cfg.get("thresholds_z", {})
+                manip_cfg = cfg.get("manipulation", {})
+            else:
+                # Fallback default
+                weights_z = {"trend": 0.35, "volume": 0.20, "momentum": 0.45}
+                thresholds_z = {"buy": 65, "sell": 35, "strong_buy": 80, "strong_sell": 20}
+                manip_cfg = {"enabled": False, "penalty": -20, "min_wick_ratio": 0.6, "volume_spike_threshold": 2.5}
             
             if not weights_z or not thresholds_z:
                 return self._na("Missing weights/thresholds")
@@ -213,11 +175,20 @@ class TradingEngine:
             if not rows or len(rows) < 20:
                 return self._na_a("Insufficient data")
             
-            cfg = _get_default_config(market, interval)
-            weights_a = cfg.get("weights_a", {})
-            thresholds_a = cfg.get("thresholds_a", {})
-            min_z = cfg.get("min_z_for_a", cfg.get("min_a_score", 55))
-            deep_cfg = cfg.get("deep", {})
+            # Get config from manager
+            if self.config_loader:
+                cfg = self.config_loader.get(symbol, market, interval)
+                weights_a = cfg.get("weights_a", {})
+                thresholds_a = cfg.get("thresholds_a", {})
+                min_z = cfg.get("min_z_for_a", 55)
+                deep_cfg = cfg.get("deep", {})
+                risk_cfg = cfg.get("risk", {})
+            else:
+                weights_a = {"structure": 0.30, "indicators": 0.30, "sr": 0.20, "candle": 0.20}
+                thresholds_a = {"go": 70, "strong_buy": 85, "strong_sell": 15}
+                min_z = 55
+                deep_cfg = {"require_deep_confirm": False, "min_deep_score": 60}
+                risk_cfg = {"sl_atr_mult": 1.5, "tp_atr_mult": 2.0}
             
             z_score = z_result.get("score", 0)
             if not isinstance(z_score, (int, float)) or z_score < min_z:
@@ -263,7 +234,7 @@ class TradingEngine:
                 a_signal = "WAIT"
             
             go_thr   = thresholds_a.get("go",   70)
-            min_a    = cfg.get("min_a_score", go_thr)
+            min_a    = cfg.get("min_a_score", go_thr) if self.config_loader else go_thr
             sbuy_thr = thresholds_a.get("strong_buy",  85)
             ssell    = thresholds_a.get("strong_sell",  15)
             
@@ -277,7 +248,7 @@ class TradingEngine:
             go = (a_score >= min_a and final_sig not in ["WAIT"])
             require_deep = deep_cfg.get("require_deep_confirm", False)
             min_deep     = deep_cfg.get("min_deep_score", 60)
-            sl, tp = self._calc_sl_tp(rows, a_signal, cfg.get("risk", {}))
+            sl, tp = self._calc_sl_tp(rows, a_signal, risk_cfg)
             
             reasons = [k for k, m in [
                 ("Structure", a01), ("Indicators", a02),
@@ -300,47 +271,7 @@ class TradingEngine:
         except Exception as e:
             return self._na_a(f"A-error: {str(e)[:40]}")
 
-    def get_d_score(self, symbol: str, market: str, interval: str, rows: List, a_result: Dict) -> Dict[str, Any]:
-        try:
-            if not rows or len(rows) < 20:
-                return {"d_score":"NA","d_signal":"NA","confirmed":False,"reason":"Insufficient data"}
-            if not _d_ok:
-                return {"d_score":"NA","d_signal":"NA","confirmed":False,"reason":"D modules not loaded"}
-            
-            cfg = _get_default_config(market, interval)
-            deep_cfg = cfg.get("deep", {})
-            min_deep = a_result.get("min_deep_score", deep_cfg.get("min_deep_score", 60))
-            
-            # Note: D modules expect rows parameter, but they also try to fetch data via fetcher.
-            # To avoid that, we pass rows as a keyword argument if they support it.
-            # For now, we'll just call with rows argument (they should accept it)
-            d01 = self._run_safe(d01_analyze, True, symbol, interval, rows,
-                                 default={"signal":"WAIT","score":50,"reason":"D01 N/A"})
-            d02 = self._run_safe(d02_analyze, True, symbol, interval, rows,
-                                 default={"signal":"WAIT","score":50,"reason":"D02 N/A"})
-            d03 = self._run_safe(d03_analyze, True, symbol, interval, rows,
-                                 default={"signal":"WAIT","score":50,"reason":"D03 N/A"})
-            
-            scores = [d01.get("score",50), d02.get("score",50), d03.get("score",50)]
-            d_score = int(sum(scores) / len(scores))
-            sigs = [d01.get("signal","WAIT"), d02.get("signal","WAIT"), d03.get("signal","WAIT")]
-            buys = sigs.count("BUY")
-            sells = sigs.count("SELL")
-            d_signal = "BUY" if buys >= 2 else "SELL" if sells >= 2 else "WAIT"
-            
-            a_signal = a_result.get("a_signal", "WAIT")
-            a_dir = "BUY" if "BUY" in a_signal else "SELL" if "SELL" in a_signal else None
-            confirmed = (d_score >= min_deep and d_signal != "WAIT" and d_signal == a_dir)
-            
-            return {
-                "d_score": d_score,
-                "d_signal": d_signal,
-                "confirmed": confirmed,
-                "reason": f"Vol:{d01.get('reason','')[:12]} Str:{d02.get('reason','')[:12]} Ind:{d03.get('reason','')[:12]}",
-                "details": {"d01": d01, "d02": d02, "d03": d03}
-            }
-        except Exception as e:
-            return {"d_score":"NA","d_signal":"NA","confirmed":False,"reason": f"D-error: {str(e)[:40]}"}
+    # get_d_score removed – no longer needed (Group D removed)
 
     # ===================== Helper methods (unchanged) =====================
     @staticmethod
@@ -348,13 +279,9 @@ class TradingEngine:
         if not available:
             return default or {}
         try:
-            # If the function expects rows as keyword argument, handle it
-            # For D modules, they might have signature analyze(symbol, interval, rows=...)
-            # We'll try positional first, then keyword
             try:
                 return fn(*args) or default or {}
             except TypeError:
-                # Try with rows keyword if the last arg is rows
                 if len(args) >= 3 and isinstance(args[-1], list):
                     return fn(args[0], args[1], rows=args[-1]) or default or {}
                 raise
