@@ -1,0 +1,35 @@
+# ========== SESSION KILL ZONES (Lahore Time) ==========
+session	start	end
+London	2026-04-15T11:00:00	2026-04-15T14:00:00
+NewYork	2026-04-15T17:00:00	2026-04-15T20:00:00
+
+# ========== ECONOMIC CALENDAR (Next 24h High-Impact, Lahore Time) ==========
+datetime_lahore	currency	title	impact
+NO_HIGH_IMPACT_EVENTS	0	0	0
+
+# ========== SESSION VOLATILITY PROFILE (Hourly Avg, 30 Days, Lahore Time) ==========
+hour_lahore	avg_volatility_pct
+0	0.4505
+1	0.4808
+2	0.4801
+3	0.728
+4	0.6577
+5	0.625
+6	0.6853
+7	0.5407
+8	0.5064
+9	0.4458
+10	0.4567
+11	0.4861
+12	0.4905
+13	0.5532
+14	0.5088
+15	0.5247
+16	0.5858
+17	0.5848
+18	0.7317
+19	0.8051
+20	0.7568
+21	0.6052
+22	0.5848
+23	0.4865
