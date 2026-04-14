@@ -23,18 +23,20 @@ REAL_CURRENCY_UNCORR = [
 
 # ── Crypto ────────────────────────────────────────────────────────────────────
 CRYPTO_CORR = [
-    "BTCUSDT","ETHUSDT","BNBUSDT","XRPUSDT","ADAUSDT",
-    "DOGEUSDT","LTCUSDT","SHIBUSDT","DOTUSDT","SOLUSDT",
-    "AVAXUSDT","MATICUSDT","LINKUSDT","UNIUSDT","AAVEUSDT",
-    "ATOMUSDT","NEARUSDT","VETUSDT","TRXUSDT","EOSUSDT",
-    "XLMUSDT","ETCUSDT","XMRUSDT","BCHUSDT","ALGOUSDT",
+      "BTCUSDT",   # example
+    "ETHUSDT",
+    "BNBUSDT",
+    "LTCUSDT",
+    "SOLUSDT",
+    "ADAUSDT",
+    "DOGEUSDT",
+    "DOTUSDT",
+    "ZECUSDT",
+    "LINKUSDT"
 ]
 CRYPTO_UNCORR = [
-    "PEPEUSDT","BONKUSDT","POPCATUSDT","TURBOUSDT","BRETTUSDT",
-    "GMEUSDT","AMCUSDT","TRUMPUSDT","MELANIAUSDT","WIFUSDT",
-    "MOGUSDT","SPX6900USDT","APUUSDT","DAIUSDT","USDCUSDT",
-    "XAUTUSDT","PAXGUSDT","FDUSDUSDT","TUSDUSDT","EURTUSDT",
-]
+    
+    ]
 
 # ── Commodity ─────────────────────────────────────────────────────────────────
 COMMODITY_CORR = [
