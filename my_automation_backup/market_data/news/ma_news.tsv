@@ -1,0 +1,22 @@
+timestamp	datetime	source	title	sentiment
+1777990494	2026-05-05 19:14:54	finnhub_calendar	EU ECB de Guindos Speech - Impact: MEDIUM	0
+1777990494	2026-05-05 19:14:54	finnhub_calendar	EU ECOFIN Meeting - Impact: MEDIUM	0
+1777990494	2026-05-05 19:14:54	finnhub_calendar	JP International Children’s Day - Impact: LOW	0
+1777990494	2026-05-05 19:14:54	finnhub_calendar	KR International Children’s Day - Impact: LOW	0
+1777990494	2026-05-05 19:14:54	finnhub_calendar	KG Kyrgyz Republic Constitution Day - Impact: LOW	0
+1777990494	2026-05-05 19:14:54	finnhub_calendar	NL Liberation Day - Impact: LOW	0
+1777990494	2026-05-05 19:14:54	finnhub_calendar	CN May Day - Impact: LOW	0
+1777990494	2026-05-05 19:14:54	finnhub_calendar	ET Patriots’ Victory Day - Impact: LOW	0
+1777990494	2026-05-05 19:14:54	finnhub_calendar	KH Royal Ploughing Ceremony - Impact: LOW	0
+1777990494	2026-05-05 19:14:54	finnhub_calendar	TH S&P Global Manufacturing PMI - Impact: LOW	0
+1777990494	2026-05-05 19:14:54	finnhub_news	Executives are burning out, just like their employees—and they don't know how to handle it, management experts say	0
+1777990494	2026-05-05 19:14:54	finnhub_news	Jim Cramer's top 10 things to watch in the stock market Tuesday	0
+1777990494	2026-05-05 19:14:54	finnhub_news	Most prediction market traders don't make a profit—Gen Z and millennials are turning to them anyway	0
+1777990494	2026-05-05 19:14:54	finnhub_news	Pfizer tops Wall Street estimates, reaffirms outlook as newer products show growth	0
+1777990494	2026-05-05 19:14:54	finnhub_news	Hugo Boss tops profit forecasts even as Iran war hits markets - Reuters	1
+1777990494	2026-05-05 19:14:54	finnhub_news	Iran war gives small boost to thermal coal, further gains possible - Reuters	1
+1777990494	2026-05-05 19:14:54	finnhub_news	Maersk unit's US-flagged ship transits Hormuz accompanied by US military - Reuters	0
+1777990494	2026-05-05 19:14:54	finnhub_news	Exclusive: US intelligence indicates limited new damage to Iran's nuclear program, sources say - Reuters	0
+1777990494	2026-05-05 19:14:54	finnhub_news	Bessent urges China to step up diplomacy on Iran ahead of Trump-Xi summit - Reuters	1
+1777990494	2026-05-05 19:14:54	finnhub_news	Which stocks do I actually own? Why experts say it's important to know	0
+#fetch_time: 1777990494
