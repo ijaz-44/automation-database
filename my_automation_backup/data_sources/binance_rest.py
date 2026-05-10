@@ -1,7 +1,6 @@
-# data_sources/binance_rest.py
 """
-Binance REST Manager – coordinates other modules but does NOT fetch klines.
-Kline fetching is handled by X01_klines_rest.py (SQLite).
+Binance REST API Call Tracker
+Central counter for all Binance REST API calls.
 """
 
 import os
@@ -16,22 +15,13 @@ class BinanceREST:
         os.makedirs(DATA_DIR, exist_ok=True)
         self.symbols_dir = os.path.join(DATA_DIR, "symbols")
         os.makedirs(self.symbols_dir, exist_ok=True)
-        print("✅ [BinanceREST] Initialized (manager mode – no kline fetching)")
+        print("✅ [BinanceREST] Initialized (API call tracker)")
 
-    # ========== Dummy methods for compatibility (no kline handling) ==========
-    def needs_fill(self, symbol, minutes=120):
-        """Dummy – always returns False. Kline filling is done by X01."""
-        return False
+    @classmethod
+    def increment_calls(cls, count=1):
+        cls._total_calls += count
+        print(f"[BinanceREST] Calls incremented to {cls._total_calls}")  # Debug
 
-    def fill_gaps(self, symbol, minutes=120):
-        """Dummy – does nothing. Use X01_klines_rest.py for fetching klines."""
-        print(f"[BinanceREST] fill_gaps called for {symbol} but disabled (use X01)")
-
-    def get_candles_for_symbol(self, symbol):
-        """Dummy – returns empty list. Use X01 SQLite database."""
-        return []
-
-    # ========== API call tracking (kept for compatibility) ==========
     @classmethod
     def get_total_calls(cls):
         return cls._total_calls
@@ -40,4 +30,4 @@ class BinanceREST:
     def reset_calls(cls):
         cls._total_calls = 0
 
-print("✅ [binance_rest] Module loaded (manager only)")
+print("✅ [binance_rest] Module loaded (call tracker only)")
