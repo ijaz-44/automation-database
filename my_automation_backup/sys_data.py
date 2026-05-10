@@ -4,7 +4,7 @@ import time
 import threading
 import traceback
 import json
-from engine import get_engine
+import sqlite3
 from pairs import (get_pairs_by_market, is_crypto_symbol,
                    get_real_currency_pairs, get_all_pairs)
 from data_sources.binance_ws   import BinanceWebSocket
@@ -13,92 +13,111 @@ from data_sources.finnhub_ws   import FinnhubWebSocket
 from data_sources.finnhub_rest import FinnhubREST
 from data_sources.iqoption_ws  import IQOptionWS
 
-# CVD module
-from Groups.group_x.X03_cvd_rest import backfill_cvd_advanced
-# Depth module
-from Groups.group_x.X05_depth_ws import DepthWebSocket
-# Derivative modules
-from Groups.group_x.X07_derivative_rest import DerivativeRest
-from Groups.group_x.X08_derivative_ws import DerivativeWebSocket
-# Correlation modules
-from Groups.group_x.X09_correlation_rest import CorrelationRest
-from Groups.group_x.X10_correlation_ws import CorrelationWebSocket
-
-# Conditional imports for optional modules (may not exist yet)
+# ==================== Direct imports from group_x ====================
 try:
-    from Groups.group_x.X11_macro_rest import MacroDataFetcher
-    X11_AVAILABLE = True
+    from Groups.group_x.X01_klines_rest import fetch_and_update_ws
 except ImportError:
-    X11_AVAILABLE = False
-    print("[WARN] X11_macro_rest not available, macro data disabled")
+    fetch_and_update_ws = None
+    print("[WARN] X01_klines_rest not available")
 
 try:
-    from Groups.group_x.X13_liquidations_rest import LiquidationDataREST
-    X13_AVAILABLE = True
+    from Groups.group_x.X03_cvd_rest import backfill_cvd_advanced
 except ImportError:
-    X13_AVAILABLE = False
-    print("[WARN] X13_liquidations_rest not available, liquidation data disabled")
+    backfill_cvd_advanced = None
+    print("[WARN] X03_cvd_rest not available")
 
 try:
-    from Groups.group_x.X15_session_rest import collect_and_save as session_collect
-    X15_AVAILABLE = True
+    from Groups.group_x.X05_depth_rest import update_depth
 except ImportError:
-    X15_AVAILABLE = False
-    print("[WARN] X15_session_rest not available, session data disabled")
+    update_depth = None
+    print("[WARN] X05_depth_rest not available")
 
 try:
-    from Groups.group_x.X17_sentiment_rest import SentimentData
-    X17_AVAILABLE = True
+    from Groups.group_x.X07_derivative_rest import DerivativeRest
 except ImportError:
-    X17_AVAILABLE = False
-    print("[WARN] X17_sentiment_rest not available, sentiment data disabled")
+    DerivativeRest = None
+    print("[WARN] X07_derivative_rest not available")
+
+try:
+    from Groups.group_x.X13_liquidation_rest import LiquidationDataREST
+except ImportError:
+    LiquidationDataREST = None
+    print("[WARN] X13_liquidation_rest not available")
 
 try:
     from Groups.group_x.X19_volProfile_rest import VolumeProfile
-    X19_AVAILABLE = True
 except ImportError:
-    X19_AVAILABLE = False
-    print("[WARN] X19_volProfile_rest not available, volume profile disabled")
+    VolumeProfile = None
+    print("[WARN] X19_volProfile_rest not available")
 
 try:
     from Groups.group_x.X21_mstructure_rest import MarketStructure
-    X21_AVAILABLE = True
 except ImportError:
-    X21_AVAILABLE = False
-    print("[WARN] X21_mstructure_rest not available, market structure disabled")
+    MarketStructure = None
+    print("[WARN] X21_mstructure_rest not available")
+
+# Other disabled modules (keep as is)
+try:
+    from Groups.group_x.X08_derivative_ws import DerivativeWebSocket
+except ImportError:
+    DerivativeWebSocket = None
+
+try:
+    from Groups.group_x.X09_correlation_rest import CorrelationRest
+except ImportError:
+    CorrelationRest = None
+
+try:
+    from Groups.group_x.X10_correlation_ws import CorrelationWebSocket
+except ImportError:
+    CorrelationWebSocket = None
+
+try:
+    from Groups.group_x.X11_macro_rest import MacroDataFetcher
+except ImportError:
+    MacroDataFetcher = None
+
+try:
+    from Groups.group_x.X15_session_rest import session_collect
+except ImportError:
+    session_collect = None
+
+try:
+    from Groups.group_x.X17_sentiment_rest import SentimentData
+except ImportError:
+    SentimentData = None
 
 try:
     from Groups.group_x.X23_onchain_rest import collect_and_save as onchain_collect
-    X23_AVAILABLE = True
 except ImportError:
-    X23_AVAILABLE = False
-    print("[WARN] X23_onchain_rest not available, on‑chain data disabled")
+    onchain_collect = None
+    print("[WARN] X23_onchain_rest not available")
 
 try:
-    from Groups.group_x.X25_tick_rest import collect_and_save as tick_collect
-    X25_AVAILABLE = True
+    from Groups.group_x.X25_tick_rest import tick_collect
 except ImportError:
-    X25_AVAILABLE = False
-    print("[WARN] X25_tick_rest not available, tick data disabled")
+    tick_collect = None
+    print("[WARN] X25_tick_rest not available")
+# ========================================================================
 
 print("[SysData] Loading...")
 
-# ── Global status tracking for fill operations ──
+# ── Global status tracking for call operations ──
 _fill_status = {}
 _status_lock = threading.Lock()
 
 def update_status(symbol, component, completed=True):
     with _status_lock:
         if symbol not in _fill_status:
-            _fill_status[symbol] = {'cvd': False, 'depth': False, 'derivative': False, 'correlation': False, 'candles': False}
+            _fill_status[symbol] = {}
         _fill_status[symbol][component] = completed
-        print(f"[FillStatus] {symbol} - {component} = {completed}", flush=True)
+        print(f"[CallStatus] {symbol} - {component} = {completed}", flush=True)
 
 def get_fill_status(symbol):
     with _status_lock:
         return _fill_status.get(symbol, {})
 
-# ── RealHandler (Binance + Finnhub) ─────────────────────────────────────────
+# ── RealHandler (Binance + Finnhub) – updated for SQLite derivatives, liquidations, mstructure ──
 class RealHandler:
     def __init__(self):
         self.binance_ws = BinanceWebSocket()
@@ -106,16 +125,13 @@ class RealHandler:
         self.binance_rest = BinanceREST()
         self.finnhub_rest = FinnhubREST()
         self._started = False
-
         self.data_dir = os.path.join(os.path.dirname(__file__), "market_data", "binance")
-        
-        self.depth_ws = None
         self.derivative_rest = None
-        self.derivative_ws = None
+        self.liquidation_rest = None
+        self.mstructure_rest = None
         self.active_derivative_symbols = set()
-        self.correlation_rest = None
-        self.correlation_ws = None
-        self.cvd_ws = None
+        self.active_liquidation_symbols = set()
+        self.active_mstructure_symbols = set()
 
     def start(self, pairs):
         if self._started:
@@ -132,7 +148,7 @@ class RealHandler:
     def get_candles(self, symbol, interval="1m", limit=100):
         sym = symbol.lower()
         if is_crypto_symbol(sym.upper()):
-            return self.binance_ws.get_candles(sym, interval, limit)
+            return self.binance_ws.get_candles(sym, limit)
         else:
             return self.finnhub_ws.get_candles(sym, interval, limit)
 
@@ -157,63 +173,31 @@ class RealHandler:
         else:
             return self.finnhub_ws.get_closed_count(sym)
 
+    def get_last_update(self, symbol):
+        sym = symbol.lower()
+        if is_crypto_symbol(sym.upper()):
+            return self.binance_ws.get_last_update(sym)
+        else:
+            return self.finnhub_ws.get_last_update(sym)
+
     def stop(self):
         self.binance_ws.disconnect()
         self.finnhub_ws.disconnect()
-        if self.depth_ws:
-            self.depth_ws.stop()
-        if self.derivative_ws:
-            self.derivative_ws.stop()
         if self.derivative_rest:
             self.derivative_rest.stop()
-        if self.correlation_rest:
-            self.correlation_rest.stop()
-        if self.cvd_ws:
-            self.cvd_ws.stop()
+        if self.liquidation_rest:
+            self.liquidation_rest.stop()
+        if self.mstructure_rest:
+            self.mstructure_rest.stop()
 
-    # ---------- CVD (REST backfill + WebSocket) ----------
-    def _ensure_cvd_ws(self):
-        if self.cvd_ws is None:
-            from Groups.group_x.X04_cvd_ws import CVDWebSocket
-            self.cvd_ws = CVDWebSocket(self.data_dir)
-            self.cvd_ws.set_symbols([])
-            print("[RealHandler] CVD WebSocket created and started", flush=True)
-
+    # ---------- CVD (X03) – DISABLED ----------
     def compute_and_save_cvd(self, symbol):
+        print(f"[CVD] Temporarily disabled", flush=True)
         clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
-        print(f"[CVD] Starting for {clean}", flush=True)
-        if not is_crypto_symbol(clean):
-            print(f"[CVD] {clean} is not crypto, skipping", flush=True)
-            update_status(clean, 'cvd', True)
-            return
-        print(f"[CVD] Computing for {clean}", flush=True)
-        config = {
-            'cvd': {'minutes': 300, 'max_ticks': 50000},
-            'footprint': {'minutes': 90, 'max_ticks': 50000},
-            'imbalance': {'minutes': 30, 'max_ticks': 5000},
-            'absorption': {'minutes': 30, 'max_ticks': 10000}
-        }
-        try:
-            result = backfill_cvd_advanced(clean, config, max_total_trades=50000, max_cluster_levels=50)
-            if "error" in result:
-                print(f"[CVD] Error: {result['error']}", flush=True)
-                update_status(clean, 'cvd', False)
-                return
-            filepath = os.path.join(self.data_dir, "symbols", f"{clean.lower()}_cvd.tsv")
-            if os.path.exists(filepath):
-                update_status(clean, 'cvd', True)
-                print(f"[CVD] Saved to {filepath}", flush=True)
-            else:
-                update_status(clean, 'cvd', False)
-                print(f"[CVD] File not saved: {filepath}", flush=True)
-            self._ensure_cvd_ws()
-            self.cvd_ws.add_symbol_metrics(clean, {})
-        except Exception as e:
-            print(f"[CVD] Exception: {e}", flush=True)
-            traceback.print_exc()
-            update_status(clean, 'cvd', False)
+        update_status(clean, 'cvd', True)
+        return
 
-    # ---------- Depth (REST snapshot only) ----------
+    # ---------- Depth (X05_depth_rest) – SQLite ----------
     def activate_depth_for_symbol(self, symbol):
         clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
         print(f"[Depth] Activating for {clean}", flush=True)
@@ -221,40 +205,34 @@ class RealHandler:
             print(f"[Depth] {clean} is not crypto, skipping", flush=True)
             update_status(clean, 'depth', True)
             return
+        if update_depth is None:
+            print(f"[Depth] X05_depth_rest.update_depth not available", flush=True)
+            update_status(clean, 'depth', False)
+            return
         try:
-            from Groups.group_x.X06_depth_rest import fetch_depth_snapshot
-            snapshot = fetch_depth_snapshot(clean, limit=500)
-            if snapshot:
-                symbols_dir = os.path.join(self.data_dir, "symbols")
-                os.makedirs(symbols_dir, exist_ok=True)
-                filepath = os.path.join(symbols_dir, f"{clean.lower()}_depth.tsv")
-                with open(filepath, 'w') as f:
-                    f.write("type\tprice\tquantity\n")
-                    for p, q in snapshot['bids'][:200]:
-                        f.write(f"bid\t{p}\t{q}\n")
-                    for p, q in snapshot['asks'][:200]:
-                        f.write(f"ask\t{p}\t{q}\n")
-                if os.path.exists(filepath):
-                    update_status(clean, 'depth', True)
-                    print(f"[Depth] Saved snapshot for {clean}", flush=True)
-                else:
-                    update_status(clean, 'depth', False)
+            update_depth(clean)
+            db_path = os.path.join(self.data_dir, "symbols", f"{clean.lower()}_depth.db")
+            if os.path.exists(db_path) and os.path.getsize(db_path) > 100:
+                update_status(clean, 'depth', True)
+                print(f"[Depth] Saved SQLite DB for {clean}", flush=True)
             else:
-                print(f"[Depth] Failed to fetch snapshot for {clean}", flush=True)
                 update_status(clean, 'depth', False)
         except Exception as e:
             print(f"[Depth] Error: {e}", flush=True)
             traceback.print_exc()
             update_status(clean, 'depth', False)
 
-    # ---------- Derivative (Futures) with liquidation analysis ----------
+    # ---------- Derivative (X07) – SQLITE ----------
     def _ensure_derivative_modules(self):
-        if self.derivative_rest is None:
-            print("[Derivative] Initializing modules...", flush=True)
+        if DerivativeRest is not None and self.derivative_rest is None:
+            print("[Derivative] Initializing module...", flush=True)
             self.derivative_rest = DerivativeRest(self.data_dir)
 
     def activate_derivative_for_symbol(self, symbol):
         clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
+        if DerivativeRest is None:
+            update_status(clean, 'derivative', False)
+            return
         print(f"[Derivative] Activating for {clean}", flush=True)
         if not is_crypto_symbol(clean):
             print(f"[Derivative] {clean} is not crypto, skipping", flush=True)
@@ -263,290 +241,168 @@ class RealHandler:
         try:
             self._ensure_derivative_modules()
             self.active_derivative_symbols.add(clean)
-            if self.derivative_ws is None:
-                self.derivative_ws = DerivativeWebSocket(self.data_dir, self.derivative_rest, min_quantity=1.0)
-                self.derivative_ws.start(list(self.active_derivative_symbols))
-            self.derivative_rest.collect_and_save(clean)
-            filepath = os.path.join(self.data_dir, "symbols", f"{clean.lower()}_derivative.tsv")
-            if os.path.exists(filepath):
+            if self.derivative_rest:
+                self.derivative_rest.collect_and_save(clean)
+            db_path = os.path.join(self.data_dir, "symbols", f"{clean.lower()}_derivative.db")
+            if os.path.exists(db_path) and os.path.getsize(db_path) > 100:
                 update_status(clean, 'derivative', True)
-                print(f"[Derivative] Saved data and analysis for {clean}", flush=True)
+                print(f"[Derivative] Saved SQLite DB for {clean}", flush=True)
             else:
                 update_status(clean, 'derivative', False)
-                print(f"[Derivative] File not saved: {filepath}", flush=True)
+                print(f"[Derivative] DB not saved: {db_path}", flush=True)
         except Exception as e:
             print(f"[Derivative] Error: {e}", flush=True)
             traceback.print_exc()
             update_status(clean, 'derivative', False)
 
-    # ---------- Correlation (threshold 2 rows) ----------
-    def _ensure_correlation_modules(self):
-        if self.correlation_rest is None:
-            print("[Correlation] Initializing modules...", flush=True)
-            self.correlation_rest = CorrelationRest(self.data_dir)
+    # ---------- Liquidations (X13) – SQLITE (enabled) ----------
+    def _ensure_liquidation_modules(self):
+        if LiquidationDataREST is not None and self.liquidation_rest is None:
+            print("[Liquidations] Initializing module...", flush=True)
+            self.liquidation_rest = LiquidationDataREST(self.data_dir)
 
-    def _get_correlation_row_count(self, symbol):
-        clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
-        filepath = os.path.join(self.data_dir, "symbols", f"{clean.lower()}_correlation.tsv")
-        if not os.path.exists(filepath):
-            return 0
-        try:
-            with open(filepath, 'r') as f:
-                lines = f.readlines()
-            return max(0, len(lines) - 1)
-        except Exception:
-            return 0
-
-    def activate_correlation_for_symbol(self, symbol):
-        clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
-        print(f"[Correlation] Activating for {clean}", flush=True)
-        if not is_crypto_symbol(clean):
-            print(f"[Correlation] {clean} is not crypto, skipping", flush=True)
-            update_status(clean, 'correlation', True)
-            return
-        try:
-            self._ensure_correlation_modules()
-            self.correlation_rest.collect_and_save(clean)
-            row_count = self._get_correlation_row_count(clean)
-            if row_count >= 2:
-                update_status(clean, 'correlation', True)
-                print(f"[Correlation] File has {row_count} rows -> ENOUGH (>=2), status True", flush=True)
-            else:
-                update_status(clean, 'correlation', False)
-                print(f"[Correlation] File has only {row_count} rows -> NOT enough, status False", flush=True)
-        except Exception as e:
-            print(f"[Correlation] Error: {e}", flush=True)
-            traceback.print_exc()
-            update_status(clean, 'correlation', False)
-
-    # ---------- Macro data (X11) ----------
-    def fetch_macro_data(self, symbol):
-        if not X11_AVAILABLE:
-            print("[Macro] X11 module not available, skipping", flush=True)
-            return
-        clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
-        # Delete old macro file first
-        filepath = os.path.join(self.data_dir, "symbols", f"{clean.lower()}_macro.tsv")
-        if os.path.exists(filepath):
-            os.remove(filepath)
-            print(f"[Macro] Deleted old file: {filepath}", flush=True)
-        print("[Macro] Starting macro data fetch (X11)", flush=True)
-        try:
-            fetcher = MacroDataFetcher()
-            fetcher.fetch_and_save_all(clean)  # saves to symbol_macro.tsv
-            # Check if file was created
-            if os.path.exists(filepath):
-                update_status(clean, 'macro', True)
-                print("[Macro] Macro data saved", flush=True)
-            else:
-                update_status(clean, 'macro', False)
-                print("[Macro] Failed to save macro data", flush=True)
-        except Exception as e:
-            print(f"[Macro] Error: {e}", flush=True)
-            traceback.print_exc()
-            update_status(clean, 'macro', False)
-
-    # ---------- X13 Liquidations ----------
     def run_x13_liquidations(self, symbol):
-        if not X13_AVAILABLE:
-            print("[X13] Module not available, skipping", flush=True)
-            return
         clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
-        filepath = os.path.join(self.data_dir, "symbols", f"{clean.lower()}_liquidations.tsv")
-        if os.path.exists(filepath):
-            os.remove(filepath)
-            print(f"[X13] Deleted old file: {filepath}", flush=True)
-        print("[X13] Starting liquidation data fetch", flush=True)
+        if LiquidationDataREST is None:
+            print("[Liquidations] Module not available", flush=True)
+            update_status(clean, 'liquidations', False)
+            return
+        print(f"[Liquidations] Starting for {clean}", flush=True)
+        if not is_crypto_symbol(clean):
+            print(f"[Liquidations] {clean} is not crypto, skipping", flush=True)
+            update_status(clean, 'liquidations', True)
+            return
         try:
-            liq = LiquidationDataREST()
-            liq.collect_and_save(clean)
-            if os.path.exists(filepath):
+            self._ensure_liquidation_modules()
+            if self.liquidation_rest:
+                self.liquidation_rest.collect_and_save(clean)
+            db_path = os.path.join(self.data_dir, "symbols", f"{clean.lower()}_liquidations.db")
+            if os.path.exists(db_path) and os.path.getsize(db_path) > 100:
                 update_status(clean, 'liquidations', True)
+                print(f"[Liquidations] Saved SQLite DB for {clean}", flush=True)
             else:
                 update_status(clean, 'liquidations', False)
         except Exception as e:
-            print(f"[X13] Error: {e}", flush=True)
+            print(f"[Liquidations] Error: {e}", flush=True)
             traceback.print_exc()
             update_status(clean, 'liquidations', False)
 
-    # ---------- X15 Session ----------
+    # ---------- Market Structure (X21) – SQLITE (enabled) ----------
+    def _ensure_mstructure_modules(self):
+        if MarketStructure is not None and self.mstructure_rest is None:
+            print("[MStructure] Initializing module...", flush=True)
+            self.mstructure_rest = MarketStructure()
+
+    def run_x21_mstructure(self, symbol):
+        clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
+        if MarketStructure is None:
+            print("[MStructure] Module not available", flush=True)
+            update_status(clean, 'mstructure', False)
+            return
+        print(f"[MStructure] Starting for {clean}", flush=True)
+        if not is_crypto_symbol(clean):
+            print(f"[MStructure] {clean} is not crypto, skipping", flush=True)
+            update_status(clean, 'mstructure', True)
+            return
+        try:
+            self._ensure_mstructure_modules()
+            if self.mstructure_rest:
+                self.mstructure_rest.collect_and_save(clean)
+            db_path = os.path.join(self.data_dir, "symbols", f"{clean.lower()}_mstructure.db")
+            if os.path.exists(db_path) and os.path.getsize(db_path) > 100:
+                update_status(clean, 'mstructure', True)
+                print(f"[MStructure] Saved SQLite DB for {clean}", flush=True)
+            else:
+                update_status(clean, 'mstructure', False)
+        except Exception as e:
+            print(f"[MStructure] Error: {e}", flush=True)
+            traceback.print_exc()
+            update_status(clean, 'mstructure', False)
+
+    # ---------- Other disabled modules ----------
+    def activate_correlation_for_symbol(self, symbol):
+        print(f"[Correlation] Temporarily disabled", flush=True)
+        clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
+        update_status(clean, 'correlation', True)
+
+    def fetch_macro_data(self, symbol):
+        print(f"[Macro] Temporarily disabled", flush=True)
+        clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
+        update_status(clean, 'macro', True)
+
     def run_x15_session(self, symbol):
-        if not X15_AVAILABLE:
-            print("[X15] Module not available, skipping", flush=True)
-            return
+        print(f"[X15] Temporarily disabled", flush=True)
         clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
-        filepath = os.path.join(self.data_dir, "symbols", f"{clean.lower()}_sessions.tsv")
-        if os.path.exists(filepath):
-            os.remove(filepath)
-            print(f"[X15] Deleted old file: {filepath}", flush=True)
-        print("[X15] Starting session analysis", flush=True)
-        try:
-            session_collect(clean)
-            if os.path.exists(filepath):
-                update_status(clean, 'sessions', True)
-            else:
-                update_status(clean, 'sessions', False)
-        except Exception as e:
-            print(f"[X15] Error: {e}", flush=True)
-            traceback.print_exc()
-            update_status(clean, 'sessions', False)
+        update_status(clean, 'sessions', True)
 
-    # ---------- X17 Sentiment ----------
     def run_x17_sentiment(self, symbol):
-        if not X17_AVAILABLE:
-            print("[X17] Module not available, skipping", flush=True)
-            return
+        print(f"[X17] Temporarily disabled", flush=True)
         clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
-        filepath = os.path.join(self.data_dir, "symbols", f"{clean.lower()}_sentiment.tsv")
-        if os.path.exists(filepath):
-            os.remove(filepath)
-            print(f"[X17] Deleted old file: {filepath}", flush=True)
-        print("[X17] Starting sentiment data fetch", flush=True)
-        try:
-            sent = SentimentData()
-            sent.collect_and_save(clean)
-            if os.path.exists(filepath):
-                update_status(clean, 'sentiment', True)
-            else:
-                update_status(clean, 'sentiment', False)
-        except Exception as e:
-            print(f"[X17] Error: {e}", flush=True)
-            traceback.print_exc()
-            update_status(clean, 'sentiment', False)
+        update_status(clean, 'sentiment', True)
 
-    # ---------- X19 Volume Profile ----------
     def run_x19_volprofile(self, symbol):
-        if not X19_AVAILABLE:
+        if VolumeProfile is None:
             print("[X19] Module not available, skipping", flush=True)
             return
         clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
-        filepath = os.path.join(self.data_dir, "symbols", f"{clean.lower()}_volProfile.tsv")
-        if os.path.exists(filepath):
-            os.remove(filepath)
-            print(f"[X19] Deleted old file: {filepath}", flush=True)
-        print("[X19] Starting volume profile analysis", flush=True)
+        db_path = os.path.join(self.data_dir, "symbols", f"{clean.lower()}_volProfile.db")
+        old_toon = os.path.join(self.data_dir, "symbols", f"{clean.lower()}_volProfile.toon")
+        if os.path.exists(old_toon):
+            os.remove(old_toon)
+            print(f"[X19] Removed legacy .toon: {old_toon}", flush=True)
+        print("[X19] Starting volume profile analysis (SQLite)", flush=True)
         try:
             vp = VolumeProfile()
             vp.collect_and_save(clean)
-            if os.path.exists(filepath):
+            if os.path.exists(db_path) and os.path.getsize(db_path) > 100:
                 update_status(clean, 'volProfile', True)
+                print(f"[X19] SQLite DB saved: {db_path}", flush=True)
             else:
                 update_status(clean, 'volProfile', False)
+                print(f"[X19] Failed to save SQLite DB: {db_path}", flush=True)
         except Exception as e:
             print(f"[X19] Error: {e}", flush=True)
             traceback.print_exc()
             update_status(clean, 'volProfile', False)
 
-    # ---------- X21 Market Structure ----------
-    def run_x21_mstructure(self, symbol):
-        if not X21_AVAILABLE:
-            print("[X21] Module not available, skipping", flush=True)
-            return
-        clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
-        filepath = os.path.join(self.data_dir, "symbols", f"{clean.lower()}_mstructure.tsv")
-        if os.path.exists(filepath):
-            os.remove(filepath)
-            print(f"[X21] Deleted old file: {filepath}", flush=True)
-        print("[X21] Starting market structure analysis", flush=True)
-        try:
-            ms = MarketStructure()
-            ms.collect_and_save(clean)
-            if os.path.exists(filepath):
-                update_status(clean, 'mstructure', True)
-            else:
-                update_status(clean, 'mstructure', False)
-        except Exception as e:
-            print(f"[X21] Error: {e}", flush=True)
-            traceback.print_exc()
-            update_status(clean, 'mstructure', False)
-
-    # ---------- X23 On‑chain ----------
     def run_x23_onchain(self, symbol):
-        if not X23_AVAILABLE:
-            print("[X23] Module not available, skipping", flush=True)
-            return
+        print(f"[X23] Temporarily disabled", flush=True)
         clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
-        filepath = os.path.join(self.data_dir, "symbols", f"{clean.lower()}_onchain.tsv")
-        if os.path.exists(filepath):
-            os.remove(filepath)
-            print(f"[X23] Deleted old file: {filepath}", flush=True)
-        print("[X23] Starting on‑chain data fetch", flush=True)
-        try:
-            onchain_collect(clean)
-            if os.path.exists(filepath):
-                update_status(clean, 'onchain', True)
-            else:
-                update_status(clean, 'onchain', False)
-        except Exception as e:
-            print(f"[X23] Error: {e}", flush=True)
-            traceback.print_exc()
-            update_status(clean, 'onchain', False)
+        update_status(clean, 'onchain', True)
 
-    # ---------- X25 Tick ----------
     def run_x25_tick(self, symbol):
-        if not X25_AVAILABLE:
-            print("[X25] Module not available, skipping", flush=True)
-            return
+        print(f"[X25] Temporarily disabled", flush=True)
         clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
-        filepath = os.path.join(self.data_dir, "symbols", f"{clean.lower()}_tick.tsv")
-        if os.path.exists(filepath):
-            os.remove(filepath)
-            print(f"[X25] Deleted old file: {filepath}", flush=True)
-        print("[X25] Starting tick & volume profile fetch", flush=True)
-        try:
-            tick_collect(clean)
-            if os.path.exists(filepath):
-                update_status(clean, 'tick', True)
-            else:
-                update_status(clean, 'tick', False)
-        except Exception as e:
-            print(f"[X25] Error: {e}", flush=True)
-            traceback.print_exc()
-            update_status(clean, 'tick', False)
+        update_status(clean, 'tick', True)
 
-    # ---------- fill_single (parallel execution) ----------
-    def fill_single(self, symbol, minutes=120):
+    # ---------- call_single: starts all active threads ----------
+    def call_single(self, symbol, minutes=120):
         clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
-        print(f"[Fill] Starting fill for {clean}", flush=True)
+        print(f"[Call] Starting call for {clean}", flush=True)
         if is_crypto_symbol(clean):
-            # 1. Candles using X01 (direct REST + WebSocket update)
-            print("[Fill] Step 1: Candles (via X01)", flush=True)
+            print("[Call] Step 1: Candles (via X01) -> SQLite .db", flush=True)
             try:
-                from Groups.group_x.X01_klines_rest import fetch_and_update_ws
+                if fetch_and_update_ws is None:
+                    raise Exception("X01 module not available")
                 success = fetch_and_update_ws(clean, self.binance_ws)
                 if success:
                     update_status(clean, 'candles', True)
-                    print(f"[Fill] Added 1m candles for {clean} to WebSocket", flush=True)
+                    print(f"[Call] Candles saved to {clean.lower()}.db", flush=True)
                 else:
                     update_status(clean, 'candles', False)
             except Exception as e:
-                print(f"[Fill] X01 error: {e}", flush=True)
+                print(f"[Call] X01 error: {e}", flush=True)
                 traceback.print_exc()
                 update_status(clean, 'candles', False)
 
-            # 2. Macro data (X11) – background
-            print("[Fill] Step 2: Macro data (X11) in background", flush=True)
-            t_macro = threading.Thread(target=self.fetch_macro_data, args=(clean,), daemon=True)
-            t_macro.start()
-
-            # 3. Depth (fast, sequential)
-            print("[Fill] Step 3: Depth", flush=True)
+            print("[Call] Step 2: Depth (X05_depth_rest) -> SQLite .db", flush=True)
             try:
-                from Groups.group_x.X06_depth_rest import fetch_depth_snapshot
-                snapshot = fetch_depth_snapshot(clean, limit=500)
-                if snapshot:
-                    symbols_dir = os.path.join(self.data_dir, "symbols")
-                    os.makedirs(symbols_dir, exist_ok=True)
-                    filepath = os.path.join(symbols_dir, f"{clean.lower()}_depth.tsv")
-                    with open(filepath, 'w') as f:
-                        f.write("type\tprice\tquantity\n")
-                        for p, q in snapshot['bids'][:200]:
-                            f.write(f"bid\t{p}\t{q}\n")
-                        for p, q in snapshot['asks'][:200]:
-                            f.write(f"ask\t{p}\t{q}\n")
-                    if os.path.exists(filepath):
+                if update_depth is not None:
+                    update_depth(clean)
+                    db_path = os.path.join(self.data_dir, "symbols", f"{clean.lower()}_depth.db")
+                    if os.path.exists(db_path) and os.path.getsize(db_path) > 100:
                         update_status(clean, 'depth', True)
-                        print(f"[Depth] Saved snapshot for {clean}", flush=True)
+                        print(f"[Depth] Saved SQLite DB for {clean}", flush=True)
                     else:
                         update_status(clean, 'depth', False)
                 else:
@@ -556,59 +412,25 @@ class RealHandler:
                 traceback.print_exc()
                 update_status(clean, 'depth', False)
 
-            # 4. Start all remaining background threads (CVD, Derivative, Correlation, and optional X modules)
-            print("[Fill] Step 4: Starting all background tasks", flush=True)
-            
-            def run_cvd():
-                try:
-                    self.compute_and_save_cvd(clean)
-                except Exception as e:
-                    print(f"[CVD] Thread error: {e}", flush=True)
-                    traceback.print_exc()
-                    update_status(clean, 'cvd', False)
-            
-            def run_derivative():
-                try:
-                    self.activate_derivative_for_symbol(clean)
-                except Exception as e:
-                    print(f"[Derivative] Thread error: {e}", flush=True)
-                    traceback.print_exc()
-                    update_status(clean, 'derivative', False)
-            
-            def run_correlation():
-                try:
-                    self.activate_correlation_for_symbol(clean)
-                except Exception as e:
-                    print(f"[Correlation] Thread error: {e}", flush=True)
-                    traceback.print_exc()
-                    update_status(clean, 'correlation', False)
-            
-            t_cvd = threading.Thread(target=run_cvd, daemon=True)
-            t_deriv = threading.Thread(target=run_derivative, daemon=True)
-            t_corr = threading.Thread(target=run_correlation, daemon=True)
-            t_x13 = threading.Thread(target=self.run_x13_liquidations, args=(clean,), daemon=True)
-            t_x15 = threading.Thread(target=self.run_x15_session, args=(clean,), daemon=True)
-            t_x17 = threading.Thread(target=self.run_x17_sentiment, args=(clean,), daemon=True)
-            t_x19 = threading.Thread(target=self.run_x19_volprofile, args=(clean,), daemon=True)
-            t_x21 = threading.Thread(target=self.run_x21_mstructure, args=(clean,), daemon=True)
-            t_x23 = threading.Thread(target=self.run_x23_onchain, args=(clean,), daemon=True)
-            t_x25 = threading.Thread(target=self.run_x25_tick, args=(clean,), daemon=True)
-            
-            t_cvd.start()
+            print("[Call] Step 3: Starting background tasks (Derivative, Liquidations, MStructure, VolProfile)", flush=True)
+
+            # Derivative
+            t_deriv = threading.Thread(target=self.activate_derivative_for_symbol, args=(clean,), daemon=True)
+            # Liquidations
+            t_liq = threading.Thread(target=self.run_x13_liquidations, args=(clean,), daemon=True)
+            # MStructure
+            t_mstruct = threading.Thread(target=self.run_x21_mstructure, args=(clean,), daemon=True)
+            # VolProfile
+            t_vol = threading.Thread(target=self.run_x19_volprofile, args=(clean,), daemon=True)
+
             t_deriv.start()
-            t_corr.start()
-            t_x13.start()
-            t_x15.start()
-            t_x17.start()
-            t_x19.start()
-            t_x21.start()
-            t_x23.start()
-            t_x25.start()
-            
-            print("[Fill] All background tasks started", flush=True)
+            t_liq.start()
+            t_mstruct.start()
+            t_vol.start()
+
+            print("[Call] Started background tasks: Derivative, Liquidations, MStructure, VolProfile", flush=True)
         else:
-            # Non-crypto – only candles
-            print(f"[Fill] Non-crypto {clean}, only candles", flush=True)
+            print(f"[Call] Non-crypto {clean}, only candles", flush=True)
             try:
                 self.finnhub_rest.fill_gaps(clean, minutes=minutes)
                 candles = self.finnhub_rest.get_candles_for_symbol(clean)
@@ -620,14 +442,17 @@ class RealHandler:
                 else:
                     update_status(clean, 'candles', False)
             except Exception as e:
-                print(f"[Fill] Non-crypto error: {e}", flush=True)
+                print(f"[Call] Non-crypto error: {e}", flush=True)
                 update_status(clean, 'candles', False)
+            # For non-crypto, set all derivative-related status as true (or false if you prefer)
             update_status(clean, 'cvd', True)
             update_status(clean, 'depth', True)
             update_status(clean, 'derivative', True)
             update_status(clean, 'correlation', True)
-        
-        print(f"[Fill] fill_single main thread finished (background tasks running)", flush=True)
+            update_status(clean, 'liquidations', True)
+            update_status(clean, 'mstructure', True)
+
+        print(f"[Call] call_single main thread finished (background tasks running)", flush=True)
 
     def get_candle_count(self, symbol):
         if not self._started:
@@ -656,14 +481,16 @@ class IQOptionHandler:
         return self.ws.get_closed_count(symbol)
     def stop(self):
         self.ws.disconnect()
-    def fill_single(self, symbol, minutes=60):
-        print(f"[IQOptionHandler] Manual fill not implemented for {symbol}", flush=True)
+    def call_single(self, symbol, minutes=60):
+        print(f"[IQOptionHandler] Manual call not implemented for {symbol}", flush=True)
         clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
         update_status(clean, 'candles', True)
         update_status(clean, 'cvd', True)
         update_status(clean, 'depth', True)
         update_status(clean, 'derivative', True)
         update_status(clean, 'correlation', True)
+        update_status(clean, 'liquidations', True)
+        update_status(clean, 'mstructure', True)
     def get_candle_count(self, symbol):
         return self.get_closed_count(symbol, "1m")
 
@@ -684,31 +511,109 @@ class QuotexHandler:
         return 0
     def stop(self):
         pass
-    def fill_single(self, symbol, minutes=60):
-        print(f"[QuotexHandler] Manual fill not implemented for {symbol}", flush=True)
+    def call_single(self, symbol, minutes=60):
+        print(f"[QuotexHandler] Manual call not implemented for {symbol}", flush=True)
         clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
         update_status(clean, 'candles', True)
         update_status(clean, 'cvd', True)
         update_status(clean, 'depth', True)
         update_status(clean, 'derivative', True)
         update_status(clean, 'correlation', True)
+        update_status(clean, 'liquidations', True)
+        update_status(clean, 'mstructure', True)
     def get_candle_count(self, symbol):
         return 0
 
-# ── SysData main class ──────────────────────────────────────────────────────
+# ── Helper to clean dummy status strings ──
+def _clean_status(val):
+    dummy_placeholders = ["--", "--", "--", "--", "--", "--", "--", "--", "--", "--", "--"]
+    if val in dummy_placeholders:
+        return "--"
+    return val
+
+# ── SysData main class (unchanged) ──
 _current_scores = {}
 _score_lock = threading.Lock()
 
 class SysData:
     def __init__(self):
         print("[SysData] Init...", flush=True)
-        self.engine = get_engine()
         self._platform = None
         self._current_platform_name = None
         self._interval = "5m"
         self._market = ""
         self._pairs = []
+        self._checker_started = False
+        self._checker_cache = {}
+        self._checker_lock = threading.Lock()
         print("[SysData] Ready", flush=True)
+
+    def _start_checker_updater(self):
+        if self._checker_started:
+            return
+        self._checker_started = True
+        try:
+            from Groups.group_z.Z10_checker import start_background_updater
+            start_background_updater(self._pairs, interval_sec=5)
+            print("[SysData] Checker background updater started (5 sec interval)")
+        except Exception as e:
+            print(f"[SysData] Failed to start checker updater: {e}")
+
+    def _read_checker_tsv(self):
+        checker_tsv = os.path.join(os.path.dirname(__file__), "market_data", "checker.tsv")
+        if not os.path.exists(checker_tsv):
+            return {}
+        try:
+            with open(checker_tsv, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+            data_lines = [l for l in lines if not l.strip().startswith('#')]
+            if len(data_lines) < 2:
+                return {}
+            result = {}
+            for line in data_lines[1:]:
+                parts = line.strip().split('\t')
+                if len(parts) >= 14:
+                    sym = parts[1]
+                    result[sym] = {
+                        "preflight_score": int(parts[2]),
+                        "decision": parts[3],
+                        "statuses": {
+                            "sr": _clean_status(parts[4]),
+                            "trend": _clean_status(parts[5]),
+                            "news": _clean_status(parts[6]),
+                            "volatility": _clean_status(parts[7]),
+                            "correlation": _clean_status(parts[8]),
+                            "spread": _clean_status(parts[9]),
+                            "orderflow": _clean_status(parts[10]),
+                            "adr": _clean_status(parts[11])
+                        },
+                        "news_sentiment": float(parts[12]),
+                        "news_status": _clean_status(parts[6]),
+                        "news_word": parts[13] if len(parts) > 13 else "--"
+                    }
+                elif len(parts) >= 13:
+                    sym = parts[1]
+                    result[sym] = {
+                        "preflight_score": int(parts[2]),
+                        "decision": parts[3],
+                        "statuses": {
+                            "sr": _clean_status(parts[4]),
+                            "trend": _clean_status(parts[5]),
+                            "news": _clean_status(parts[6]),
+                            "volatility": _clean_status(parts[7]),
+                            "correlation": _clean_status(parts[8]),
+                            "spread": _clean_status(parts[9]),
+                            "orderflow": _clean_status(parts[10]),
+                            "adr": _clean_status(parts[11])
+                        },
+                        "news_sentiment": float(parts[12]),
+                        "news_status": _clean_status(parts[6]),
+                        "news_word": "--"
+                    }
+            return result
+        except Exception as e:
+            print(f"[SysData] Error reading checker.tsv: {e}")
+            return {}
 
     def _ensure_platform(self, src: str, pairs: list, iq_email="", iq_pwd=""):
         if self._platform and self._current_platform_name == src:
@@ -727,40 +632,91 @@ class SysData:
         self._current_platform_name = src
         return self._platform
 
+    def get_data_age(self, symbol, data_type='candles'):
+        clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
+        base_dir = os.path.join(os.path.dirname(__file__), "market_data", "binance", "symbols")
+        if data_type == 'candles':
+            filepath = os.path.join(base_dir, f"{clean.lower()}.db")
+        else:
+            filepath = os.path.join(base_dir, f"{clean.lower()}_{data_type}.db")
+        if not os.path.exists(filepath):
+            return None
+        try:
+            mtime = os.path.getmtime(filepath)
+            return int(time.time() - mtime)
+        except Exception:
+            return None
+
     def _feel(self, symbol: str, interval: str) -> dict:
         if not self._platform:
-            return {"steps": 0, "pct": 0, "color": "red"}
-        candles = self._platform.get_candles(symbol, "1m", 20)
-        now = int(time.time() * 1000)
-        cutoff = now - (20 * 60 * 1000)
-        recent_closed = {c['timestamp'] for c in candles if c['timestamp'] > cutoff}
-        live = self._platform.get_live_candle(symbol)
-        live_ts = None
-        if live and live.get('timestamp') and live['timestamp'] > cutoff:
-            live_ts = live['timestamp']
-        minutes_covered = set(recent_closed)
-        if live_ts:
-            minutes_covered.add(live_ts)
-        steps = len(minutes_covered)
-        steps = min(steps, 20)
-        pct = int(steps / 20 * 100)
-        if pct >= 40:
-            color = "green"
-        elif pct >= 5:
-            color = "orange"
+            return {"steps": 0, "pct": 0}
+        sym = symbol.lower().replace("/", "").replace(" (OTC)", "")
+        candles = self._platform.get_candles(sym, "1m", 200)
+        if not candles:
+            return {"steps": 0, "pct": 0}
+        last_ts = self._platform.get_last_update(sym)
+        now = int(time.time())
+        ws_active = (last_ts is not None and (now - last_ts) <= 60)
+        consecutive = 0
+        if len(candles) >= 1:
+            consecutive = 1
+            for i in range(len(candles)-1, 0, -1):
+                diff = candles[i]['timestamp'] - candles[i-1]['timestamp']
+                if diff == 60:
+                    consecutive += 1
+                else:
+                    break
+        if ws_active:
+            pct = 5 + min(95, consecutive * 5)
         else:
-            color = "red"
-        return {"steps": steps, "pct": pct, "color": color}
+            pct = min(95, consecutive * 5)
+        pct = min(100, pct)
+        steps = pct // 5
+        return {"steps": steps, "pct": pct}
 
     def get_feel(self, symbol: str) -> dict:
         if not self._platform:
-            return {"steps": 0, "pct": 0, "color": "red"}
+            return {"steps": 0, "pct": 0}
         return self._feel(symbol, self._interval)
 
     def _get_rows(self, symbol: str, interval: str, limit=100):
         if not self._platform:
             return []
         return self._platform.get_candles(symbol, interval, limit)
+
+    def get_file_status(self, symbol: str) -> dict:
+        clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
+        base_dir = os.path.join(os.path.dirname(__file__), "market_data", "binance", "symbols")
+        db_path = os.path.join(base_dir, f"{clean.lower()}.db")
+        if not os.path.exists(db_path):
+            return {"exists": False, "candles": 0, "age_sec": 0, "gap": 0, "stale": True}
+        try:
+            mtime = os.path.getmtime(db_path)
+            age = int(time.time() - mtime)
+            stale = age > 300
+            return {
+                "exists": True,
+                "candles": 1,
+                "age_sec": age,
+                "gap": 0,
+                "stale": stale
+            }
+        except Exception as e:
+            print(f"[SysData] get_file_status error for {symbol}: {e}", flush=True)
+            return {"exists": True, "candles": 0, "age_sec": 9999, "gap": 0, "stale": True}
+
+    def get_ws_alive(self, symbol: str, max_age_sec: int = 120) -> bool:
+        if not self._platform or self._current_platform_name != "real":
+            return False
+        sym = symbol.lower().replace("/", "").replace(" (OTC)", "")
+        if not is_crypto_symbol(sym.upper()):
+            return False
+        if hasattr(self._platform, 'binance_ws'):
+            last_up = self._platform.binance_ws.get_last_update(sym)
+            if last_up == 0:
+                return False
+            return self._platform.binance_ws.is_ws_alive(sym, max_age_sec)
+        return False
 
     def scan(self, market: str, pairs: list, src: str = "real",
              interval: str = "5m", iq_email="", iq_pwd="") -> list:
@@ -769,32 +725,71 @@ class SysData:
         self._interval = interval
         self._market = market
         self._pairs = pairs
+        
+        if not self._checker_started:
+            self._start_checker_updater()
+        
+        try:
+            from Groups.group_z.Z01_news import get_news_score
+        except ImportError:
+            get_news_score = None
+            print("[SysData] Z01_news not available")
+        
         platform = self._ensure_platform(src, pairs, iq_email, iq_pwd)
         results = []
         for pair in pairs:
             try:
                 sym = pair.upper().replace("/", "").replace(" (OTC)", "")
                 rows = self._get_rows(sym, interval, 100)
-                if rows and len(rows) >= 10:
-                    result = self.engine.get_z_score(sym, market, interval, rows)
-                else:
-                    result = {"score": "NA", "signal": "WAIT", "trend": "FLAT",
-                              "sr_position": "—", "reason": "No data",
-                              "regime": "—", "quality": "LOW"}
-                result["pair"] = pair
-                result["feel"] = self._feel(sym, interval)
+                score = 50
+                signal = "WAIT"
+                reason = "No news data"
+                if rows and len(rows) >= 10 and get_news_score:
+                    try:
+                        news_result = get_news_score(sym, interval, rows)
+                        score_mod = news_result.get("score_mod", 0)
+                        news_signal = news_result.get("signal", "WAIT")
+                        news_reason = news_result.get("reason", "")
+                        if score_mod > 0:
+                            score = min(100, 50 + score_mod)
+                            signal = news_signal if news_signal != "WAIT" else "BUY"
+                            reason = news_reason
+                        elif score_mod < 0:
+                            score = max(0, 50 + score_mod)
+                            signal = news_signal if news_signal != "WAIT" else "SELL"
+                            reason = news_reason
+                        else:
+                            score = 50
+                            signal = "WAIT"
+                            reason = "Neutral news"
+                    except Exception as e:
+                        print(f"[Scan] News error for {sym}: {e}")
+                        reason = f"News error: {str(e)[:20]}"
+                quality = "HIGH" if score >= 65 else "MED" if score >= 40 else "LOW"
+                result = {
+                    "score": score,
+                    "signal": signal,
+                    "trend": "--",
+                    "sr_position": "--",
+                    "reason": reason,
+                    "regime": "unknown",
+                    "quality": quality,
+                    "pair": pair,
+                    "feel": self._feel(sym, interval)
+                }
                 results.append(result)
             except Exception as e:
                 results.append({
                     "pair": pair, "score": "NA", "signal": "WAIT", "trend": "FLAT",
                     "sr_position": "—", "reason": f"Error: {str(e)[:30]}",
-                    "feel": {"steps":0,"pct":0,"color":"red"}
+                    "feel": {"steps": 0, "pct": 0}
                 })
         results.sort(key=lambda x: x.get("score", 0) if isinstance(x.get("score"), (int, float)) else -1, reverse=True)
         with _score_lock:
             _current_scores = {}
             for r in results:
                 pair = r["pair"]
+                sym = pair.upper().replace("/", "").replace(" (OTC)", "")
                 _current_scores[pair] = {
                     "score": r.get("score", 0),
                     "signal": r.get("signal", "WAIT"),
@@ -802,7 +797,8 @@ class SysData:
                     "reason": r.get("reason", ""),
                     "sr_position": r.get("sr_position", "—"),
                     "quality": r.get("quality", "LOW"),
-                    "feel_pct": r.get("feel", {}).get("pct", 0)
+                    "feel_pct": r.get("feel", {}).get("pct", 0),
+                    "ws_alive": self.get_ws_alive(sym)
                 }
         print(f"[SysData] Scan complete, {len(results)} results stored", flush=True)
         return results
@@ -811,30 +807,74 @@ class SysData:
         global _current_scores
         if not self._platform or not self._market or not self._pairs:
             return {}
+        checker_data = self._read_checker_tsv()
+        try:
+            from Groups.group_z.Z01_news import get_news_score
+        except ImportError:
+            get_news_score = None
         results = []
         for pair in self._pairs:
             try:
                 sym = pair.upper().replace("/", "").replace(" (OTC)", "")
                 rows = self._get_rows(sym, self._interval, 100)
-                if rows and len(rows) >= 10:
-                    result = self.engine.get_z_score(sym, self._market, self._interval, rows)
+                score = 50
+                signal = "WAIT"
+                reason = "No news data"
+                if rows and len(rows) >= 10 and get_news_score:
+                    try:
+                        news_result = get_news_score(sym, self._interval, rows)
+                        score_mod = news_result.get("score_mod", 0)
+                        news_signal = news_result.get("signal", "WAIT")
+                        news_reason = news_result.get("reason", "")
+                        if score_mod > 0:
+                            score = min(100, 50 + score_mod)
+                            signal = news_signal if news_signal != "WAIT" else "BUY"
+                            reason = news_reason
+                        elif score_mod < 0:
+                            score = max(0, 50 + score_mod)
+                            signal = news_signal if news_signal != "WAIT" else "SELL"
+                            reason = news_reason
+                        else:
+                            score = 50
+                            signal = "WAIT"
+                            reason = "Neutral news"
+                    except Exception as e:
+                        print(f"[Refresh] News error for {sym}: {e}")
+                        reason = f"News error: {str(e)[:20]}"
+                quality = "HIGH" if score >= 65 else "MED" if score >= 40 else "LOW"
+                result = {
+                    "score": score,
+                    "signal": signal,
+                    "trend": "--",
+                    "sr_position": "--",
+                    "reason": reason,
+                    "regime": "unknown",
+                    "quality": quality,
+                    "pair": pair,
+                    "feel": self._feel(sym, self._interval)
+                }
+                clean_sym = sym
+                if clean_sym in checker_data:
+                    result["gatekeeper"] = checker_data[clean_sym]
                 else:
-                    result = {"score": "NA", "signal": "WAIT", "trend": "FLAT",
-                              "sr_position": "—", "reason": "No data",
-                              "regime": "—", "quality": "LOW"}
-                result["pair"] = pair
-                result["feel"] = self._feel(sym, self._interval)
+                    result["gatekeeper"] = {}
                 results.append(result)
             except Exception as e:
                 results.append({
                     "pair": pair, "score": "NA", "signal": "WAIT", "trend": "FLAT",
                     "sr_position": "—", "reason": f"Error: {str(e)[:30]}",
-                    "feel": {"steps":0,"pct":0,"color":"red"}
+                    "feel": {"steps": 0, "pct": 0}
                 })
         with _score_lock:
             _current_scores = {}
             for r in results:
                 pair = r["pair"]
+                sym = pair.upper().replace("/", "").replace(" (OTC)", "")
+                gatekeeper = r.get("gatekeeper", {})
+                news_word = gatekeeper.get("news_word", "--")
+                news_sentiment = gatekeeper.get("news_sentiment", 0)
+                news_status = gatekeeper.get("news_status", "No news")
+                news_status = _clean_status(news_status)
                 _current_scores[pair] = {
                     "score": r.get("score", 0),
                     "signal": r.get("signal", "WAIT"),
@@ -842,7 +882,13 @@ class SysData:
                     "reason": r.get("reason", ""),
                     "sr_position": r.get("sr_position", "—"),
                     "quality": r.get("quality", "LOW"),
-                    "feel_pct": r.get("feel", {}).get("pct", 0)
+                    "feel_pct": r.get("feel", {}).get("pct", 0),
+                    "news_word": news_word,
+                    "news_sentiment": news_sentiment,
+                    "news_status": news_status,
+                    "preflight_score": gatekeeper.get("preflight_score", 0),
+                    "statuses": gatekeeper.get("statuses", {}),
+                    "ws_alive": self.get_ws_alive(sym)
                 }
         return _current_scores
 
@@ -853,19 +899,31 @@ class SysData:
             rows = self._get_rows(symbol, interval, 100)
             if not rows or len(rows) < 10:
                 return {"error": "Not enough data for analysis"}
-            z_result = self.engine.get_z_score(symbol, market, interval, rows)
-            a_result = self.engine.get_a_score(symbol, market, interval, rows, z_result)
-            a_signal = a_result.get("a_signal", "WAIT")
-            a_result["requires_deep"] = False   # Group D removed
-            a_result["forecast"] = a_result.get("forecast", {})
-            a_result["z_score"] = z_result.get("score", "NA")
-            a_result["regime"] = z_result.get("regime", "—")
-            a_result["quality"] = a_result.get("quality", "MED")
-            return a_result
+            try:
+                from Groups.group_z.Z01_news import get_news_score
+                news = get_news_score(symbol, interval, rows) if get_news_score else {"score_mod": 0}
+            except:
+                news = {"score_mod": 0}
+            score_mod = news.get("score_mod", 0)
+            a_score = 50 + score_mod
+            a_score = max(0, min(100, a_score))
+            a_signal = "BUY" if score_mod > 0 else "SELL" if score_mod < 0 else "WAIT"
+            a_signal = "STRONG BUY" if score_mod >= 20 else "BUY" if score_mod > 0 else a_signal
+            a_signal = "STRONG SELL" if score_mod <= -20 else "SELL" if score_mod < 0 else a_signal
+            return {
+                "a_score": a_score,
+                "a_signal": a_signal,
+                "go": a_score >= 70,
+                "sl": 0,
+                "tp": 0,
+                "forecast": {},
+                "reason": news.get("reason", "News based"),
+                "requires_deep": False,
+                "min_deep_score": 60,
+                "details": {"news": news}
+            }
         except Exception as e:
             return {"error": f"GO error: {str(e)}"}
-
-    # deep() method removed – Group D no longer exists
 
     def get_current_scores(self) -> dict:
         with _score_lock:
@@ -874,20 +932,17 @@ class SysData:
     def get_call_stats(self) -> dict:
         from data_sources.binance_rest import BinanceREST
         from data_sources.finnhub_rest import FinnhubREST
-        return {
-            "Binance": BinanceREST.get_total_calls(),
-            "Finnhub": FinnhubREST.get_total_calls(),
-        }
+        return {"Binance": BinanceREST.get_total_calls(), "Finnhub": FinnhubREST.get_total_calls()}
 
-    def fill_single(self, symbol: str):
+    def call_single(self, symbol: str):
         if not self._platform:
             raise RuntimeError("No platform active")
         clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
         with _status_lock:
-            _fill_status[clean] = {'cvd': False, 'depth': False, 'derivative': False, 'correlation': False, 'candles': False}
-        thread = threading.Thread(target=self._platform.fill_single, args=(symbol, 120), daemon=True)
+            _fill_status[clean] = {}
+        thread = threading.Thread(target=self._platform.call_single, args=(symbol, 120), daemon=True)
         thread.start()
-        print(f"[SysData] fill_single thread started for {clean}", flush=True)
+        print(f"[SysData] call_single thread started for {clean}", flush=True)
 
     def get_fill_status(self, symbol: str) -> dict:
         clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
@@ -898,4 +953,4 @@ class SysData:
             return 0
         return self._platform.get_candle_count(symbol)
 
-print("✅ [SysData] Loaded OK", flush=True)
+print("✅ [SysData] Loaded OK – Derivative, Liquidations, MStructure now SQLite", flush=True)
