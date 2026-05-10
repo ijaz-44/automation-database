@@ -7,32 +7,31 @@ print("[pairs] Loading...")
 
 # ── Forex ─────────────────────────────────────────────────────────────────────
 REAL_CURRENCY_CORR = [
-    "EURUSD","GBPUSD","USDJPY","USDCHF","AUDUSD",
-    "NZDUSD","USDCAD","EURGBP","EURJPY","GBPJPY",
-    "AUDJPY","CHFJPY","EURCHF","EURAUD","EURCAD",
-    "GBPCHF","GBPAUD","AUDCAD","CADCHF","CADJPY",
-    "NZDJPY","NZDCAD","AUDNZD","GBPNZD","EURNZD",
+    
 ]
 REAL_CURRENCY_UNCORR = [
-    "USDTRY","USDMXN","USDSGD","USDNOK","USDPLN",
-    "USDHUF","USDCNH","USDTHB","USDMYR","USDZAR",
-    "USDHKD","USDSEK","USDDKK","EURNOK","GBPNOK",
-    "AUDSEK","EURPLN","USDBRL","EURHUF","USDCZK",
-    "EURSEK","GBPSEK","USDILS","USDKRW","USDTWD","USDIDR",
+    
 ]
 
 # ── Crypto ────────────────────────────────────────────────────────────────────
 CRYPTO_CORR = [
-      "BTCUSDT",   # example
-    "ETHUSDT",
+      "ADAUSDT",   # example
+    "ATOMUSDT",
+    "AVAXUSDT",
+    "AXSUSDT",
     "BNBUSDT",
+    "BTCUSDT",
+    "DASHUSDT",
+    "DOGEUSDT",
+    "ETHUSDT",
+    "LINKUSDT",
     "LTCUSDT",
     "SOLUSDT",
-    "ADAUSDT",
-    "DOGEUSDT",
-    "DOTUSDT",
+    "TONUSDT",
+    "TRUMPUSDT",
+    "XRPUSDT",
     "ZECUSDT",
-    "LINKUSDT"
+    
 ]
 CRYPTO_UNCORR = [
     
@@ -40,22 +39,18 @@ CRYPTO_UNCORR = [
 
 # ── Commodity ─────────────────────────────────────────────────────────────────
 COMMODITY_CORR = [
-    "XAUUSD","XAGUSD","XPTUSD","XPDUSD","COPPERUSD",
-    "UKOIL","USOIL","NATGAS","HEATOIL","GASOLINE",
+    
 ]
 COMMODITY_UNCORR = [
-    "COFFEEUSD","COCOAUSD","WHEATUSD","CORNUSD","SOYBEANSUSD",
-    "COTTONUSD","LIVECATTLEUSD","LEANHOGSUSD","SUGARUSD","ORANGEJUICEUSD",
+    
 ]
 
 # ── Stock ─────────────────────────────────────────────────────────────────────
 STOCK_CORR = [
-    "AAPL","MSFT","GOOGL","AMZN","META",
-    "TSLA","NVDA","NFLX","AMD","CRM",
+    
 ]
 STOCK_UNCORR = [
-    "JNJ","PFE","UNH","MRK","ABBV",
-    "WMT","KO","PG","V","MA",
+    
 ]
 
 # ── Pre-built sets (for fast lookup) ─────────────────────────────────────────
