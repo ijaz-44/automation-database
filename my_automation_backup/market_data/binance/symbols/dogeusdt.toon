@@ -1,0 +1,13 @@
+# Real‑time 1m candles for DOGEUSDT – TOON format
+generated: 2026-05-07T08:28:27.637020
+source: websocket
+
+candles_4h[0]{ts,dt,o,h,l,c,v}:
+
+candles_1h[0]{ts,dt,o,h,l,c,v}:
+
+candles_15m[0]{ts,dt,o,h,l,c,v}:
+
+candles_1m[0]{ts,dt,o,h,l,c,v}:
+
+# ========== END OF TOON DATA ==========
