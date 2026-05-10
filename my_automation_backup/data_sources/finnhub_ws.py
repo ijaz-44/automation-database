@@ -31,6 +31,7 @@ class FinnhubWebSocket:
         self.tick_count      = 0
         self._last_log       = time.time()
         self._finalise_thread = None
+        self._last_update    = {}   # symbol -> last trade timestamp (ms)
         print("✅ [FinnhubWS] Initialized (TSV storage)")
 
     def _load_data(self):
@@ -133,6 +134,9 @@ class FinnhubWebSocket:
                     symbol = trade.get('s', '').lower()
                     price = float(trade.get('p', 0))
                     if symbol and price > 0:
+                        # UPDATE LAST UPDATE TIMESTAMP (every trade)
+                        self._last_update[symbol] = int(time.time() * 1000)
+
                         now = time.time()
                         self.tick_count += 1
                         if now - self._last_log > 30:
@@ -245,6 +249,11 @@ class FinnhubWebSocket:
         sym = symbol.lower()
         with self._lock:
             return self._live_candles.get(sym)
+
+    def get_last_update(self, symbol):
+        """Return timestamp (ms) of last received trade for symbol, 0 if none."""
+        sym = symbol.lower()
+        return self._last_update.get(sym, 0)
 
     def has_enough_data(self, symbol, minutes=60):
         return self.get_closed_count(symbol) >= minutes
