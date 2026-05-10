@@ -1,0 +1,12 @@
+timestamp	datetime	source	title	sentiment
+1777990494	2026-05-05 19:14:54	finnhub_calendar	EU ECB de Guindos Speech - Impact: MEDIUM	0
+1777990494	2026-05-05 19:14:54	finnhub_calendar	EU ECOFIN Meeting - Impact: MEDIUM	0
+1777990494	2026-05-05 19:14:54	finnhub_calendar	JP International Children’s Day - Impact: LOW	0
+1777990494	2026-05-05 19:14:54	finnhub_calendar	KR International Children’s Day - Impact: LOW	0
+1777990494	2026-05-05 19:14:54	finnhub_calendar	KG Kyrgyz Republic Constitution Day - Impact: LOW	0
+1777990494	2026-05-05 19:14:54	finnhub_calendar	NL Liberation Day - Impact: LOW	0
+1777990494	2026-05-05 19:14:54	finnhub_calendar	CN May Day - Impact: LOW	0
+1777990494	2026-05-05 19:14:54	finnhub_calendar	ET Patriots’ Victory Day - Impact: LOW	0
+1777990494	2026-05-05 19:14:54	finnhub_calendar	KH Royal Ploughing Ceremony - Impact: LOW	0
+1777990494	2026-05-05 19:14:54	finnhub_calendar	TH S&P Global Manufacturing PMI - Impact: LOW	0
+#fetch_time: 1777990494
