@@ -1,12 +1,20 @@
-import sys, json, os, gc
+import sys, json, os, gc, time, sqlite3, traceback
 from flask import Flask, request, jsonify, render_template_string, send_file
 from sys_data import SysData
 from pairs import get_pairs_by_market
 from config import HTML_TEMPLATE, MARKET_TIMEFRAMES
 
+# Import brain prediction module
+try:
+    from brain import predict as brain_predict
+    BRAIN_AVAILABLE = True
+except ImportError:
+    BRAIN_AVAILABLE = False
+    print("[Main] Brain module not found – AI predictions disabled")
+
 import logging
 log = logging.getLogger('werkzeug')
-log.setLevel(logging.ERROR)   # ya WARNING
+log.setLevel(logging.ERROR)
 
 print("[Main] Starting...")
 app = Flask(__name__)
@@ -20,25 +28,9 @@ except Exception as e:
 
 print("✅ [Main] Ready — http://0.0.0.0:5000")
 
-# ── Helper ────────────────────────────────────────────────────────────────────
+# ── Helper functions (unchanged) ──────────────────────────────────────────
 def _feel_html(feel: dict) -> str:
-    steps = feel.get("steps", 0)
-    color = feel.get("color", "red")
-    pct   = feel.get("pct", 0)
-    color_map = {"green": "#00cc66", "orange": "#ffaa00", "red": "#ff4444"}
-    bar_color = color_map.get(color, "#ff4444")
-    blocks = ""
-    for i in range(20):
-        if i < steps:
-            bc = bar_color
-        else:
-            bc = "#2a2a2a"
-        blocks += (f"<div style='width:4px;height:10px;background:{bc};"
-                   f"border-radius:1px;margin-right:1px;display:inline-block;'></div>")
-    return (f"<div style='display:flex;flex-direction:column;align-items:center;gap:2px;'>"
-            f"<div style='display:flex;align-items:center;' class='feel-blocks'>{blocks}</div>"
-            f"<span class='feel-pct' style='font-size:9px;color:{bar_color};'>{pct}%</span>"
-            f"</div>")
+    return '<div class="feel-cell-placeholder" style="min-width:100px;"></div>'
 
 def _score_badge(score, signal) -> str:
     if score == "NA":
@@ -58,7 +50,32 @@ def _quality_badge(quality) -> str:
     return (f"<span style='font-size:9px;padding:1px 4px;border-radius:3px;"
             f"background:{c}22;border:1px solid {c}66;color:{c};'>{quality}</span>")
 
-# ── Routes ────────────────────────────────────────────────────────────────────
+# ---------- Helper: check if all X modules DB files exist ----------
+def _all_modules_complete(symbol: str) -> bool:
+    clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
+    base_dir = os.path.join(os.path.dirname(__file__), "market_data", "binance", "symbols")
+    
+    db_path = os.path.join(base_dir, f"{clean.lower()}.db")
+    if not os.path.exists(db_path):
+        return False
+    try:
+        conn = sqlite3.connect(db_path)
+        cur = conn.execute("SELECT COUNT(*) FROM candles_summary")
+        count = cur.fetchone()[0]
+        conn.close()
+        if count < 200:
+            return False
+    except:
+        return False
+    
+    vol_db = os.path.join(base_dir, f"{clean.lower()}_volProfile.db")
+    if not os.path.exists(vol_db):
+        return False
+    
+    return True
+# ----------------------------------------------------------------
+
+# ── Routes ────────────────────────────────────────────────────────────────
 @app.route('/')
 def index():
     try:
@@ -84,46 +101,44 @@ def scan():
         rows_html = ""
         for r in results:
             pair    = r.get("pair", "")
-            score   = r.get("score", "NA")
+            score_val = r.get("score", "NA")
+            gatekeeper = r.get("gatekeeper", {})
+            preflight = gatekeeper.get("preflight_score", 0)
+            if score_val == "NA" and preflight > 0:
+                score_val = preflight
             trend   = r.get("trend", "FLAT")
             sr_pos  = r.get("sr_position", "—")
             signal  = r.get("signal", "WAIT")
             reason  = r.get("reason", "")[:30]
             quality = r.get("quality", "LOW")
-            feel    = r.get("feel", {"steps":0,"pct":0,"color":"red"})
+            feel    = r.get("feel", {"steps":0,"pct":0})
             feel_pct = feel.get("pct", 0)
-            if feel_pct == 0: status_icon = "🔴"
-            elif feel_pct < 100: status_icon = "🟡"
-            else: status_icon = "🟢"
-            status_html = f"<span class='status-light' onclick='fillSymbol(\"{pair}\")' style='cursor:pointer; font-size:14px;' title='Click to fill missing data'>{status_icon}</span>"
+
+            all_done = _all_modules_complete(pair)
+            if all_done:
+                status_icon = "🟢"
+            elif feel_pct > 0:
+                status_icon = "🟡"
+            else:
+                status_icon = "🔴"
+
+            status_html = f"<span class='status-light' onclick='fillSymbol(\"{pair}\")' style='cursor:pointer; font-size:14px;' title='Click to fetch missing data'>{status_icon}</span>"
             otc_badge = ""
             if src == "iqoption" or "(OTC)" in pair:
                 otc_badge = ("<span style='font-size:8px;color:#ffcc44;background:rgba(255,200,0,0.07);"
                              "border:1px solid rgba(255,200,0,0.2);padding:1px 4px;border-radius:3px;"
                              "margin-left:4px;'>OTC</span>")
-            if score == "NA":
+            if score_val == "NA":
                 score_badge = "<span class='sb sl'>NA</span>"
             else:
-                bc = "sh" if score >= 65 else "sm" if score >= 40 else "sl"
-                score_badge = f"<span class='sb {bc}'>{score}%</span>"
+                bc = "sh" if score_val >= 65 else "sm" if score_val >= 40 else "sl"
+                score_badge = f"<span class='sb {bc}'>{score_val}%</span>"
             trend_icon = {"UP":"▲","DOWN":"▼","RANGING":"↔","FLAT":"—"}.get(trend, "—")
             signal_color = {"STRONG BUY":"#00ff88","BUY":"#00ff88","SELL":"#ff6666",
                             "STRONG SELL":"#ff4444","WAIT":"#ffcc44"}.get(signal, "#ffcc44")
             qc = {"HIGH":"#00cc66","MED":"#ffaa00","LOW":"#ff4444"}.get(quality,"#888")
             quality_badge = f"<span style='font-size:9px;padding:1px 4px;border-radius:3px;background:{qc}22;border:1px solid {qc}66;color:{qc};'>{quality}</span>"
-            bar_color = {"green":"#00cc66","orange":"#ffaa00","red":"#ff4444"}.get(feel.get("color","red"), "#ff4444")
-            blocks = ""
-            for i in range(20):
-                if i < feel.get("steps",0):
-                    blocks += f"<div style='width:4px;height:10px;background:{bar_color};border-radius:1px;margin-right:1px;display:inline-block;'></div>"
-                else:
-                    blocks += "<div style='width:4px;height:10px;background:#2a2a2a;border-radius:1px;margin-right:1px;display:inline-block;'></div>"
-            feel_html = f"""
-            <div style='display:flex;flex-direction:column;align-items:center;gap:2px;'>
-                <div style='display:flex;align-items:center;' class='feel-blocks'>{blocks}</div>
-                <span class='feel-pct' style='font-size:9px;color:{bar_color};'>{feel_pct}%</span>
-            </div>
-            """
+            feel_html = _feel_html(feel)
             rows_html += f"""
 <tr data-pair='{pair}'>
   <td class='drag-handle' style='cursor:grab; text-align:center;'>☰</td>
@@ -136,26 +151,90 @@ def scan():
   <td>{quality_badge}</td>
   <td style='font-size:9px;color:#555;max-width:120px;overflow:hidden;'>{reason}</td>
   <td class='feel-cell' style='min-width:100px;'>{feel_html}</td>
-  <td><button class='go-btn' onclick="doGO('{market}','{pair}','{tf}')">→</button></td>
+  <td><button class='go-btn' onclick="doPredict('{market}','{pair}','{tf}', event)">→</button></td>
 </tr>"""
+        # JavaScript for expandable row and prediction
+        js = """
+<script>
+function doPredict(market, pair, tf, event) {
+    let btn = event.target;
+    let row = btn.closest('tr');
+    // Remove existing expanded row if any
+    let nextRow = row.nextElementSibling;
+    if (nextRow && nextRow.classList && nextRow.classList.contains('expand-row')) {
+        nextRow.remove();
+        return;
+    }
+    // Create new row for expansion
+    let expandRow = document.createElement('tr');
+    expandRow.classList.add('expand-row');
+    let td = document.createElement('td');
+    td.colSpan = row.cells.length;
+    td.style.padding = '10px';
+    td.style.background = '#1a1a2e';
+    td.style.borderTop = '1px solid #333';
+    td.innerHTML = '<div class="prediction-loader">Loading prediction...</div>';
+    expandRow.appendChild(td);
+    row.insertAdjacentElement('afterend', expandRow);
+    // Fetch prediction
+    fetch(`/predict/${encodeURIComponent(pair)}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                td.innerHTML = `<div style="color:red;">Error: ${data.error}</div><button class="ok-btn" onclick="this.closest('.expand-row').remove()">Close</button>`;
+                return;
+            }
+            let html = `<div style="display:flex; justify-content:space-around; text-align:center; font-size:14px;">`;
+            for (let tf of ['30m', '45m', '1h']) {
+                let dir = data[tf].direction;
+                let conf = data[tf].confidence;
+                let color = dir === 'UP' ? '#00ff88' : (dir === 'DOWN' ? '#ff4444' : '#ffcc44');
+                html += `<div style="flex:1;">
+                            <div style="font-size:12px; color:#aaa;">${tf}</div>
+                            <div style="font-size:20px; font-weight:bold; color:${color};">${dir}</div>
+                            <div style="font-size:12px;">${conf}% conf</div>
+                         </div>`;
+            }
+            html += `</div><div style="text-align:center; margin-top:8px;"><button class="ok-btn" onclick="this.closest('.expand-row').remove()">Close</button></div>`;
+            td.innerHTML = html;
+        })
+        .catch(err => {
+            td.innerHTML = `<div style="color:red;">Error: ${err.message}</div><button class="ok-btn" onclick="this.closest('.expand-row').remove()">Close</button>`;
+        });
+}
+</script>
+"""
         return f"""
 <table id='stbl'>
   <thead>
-    <tr>
-      <th style='width:20px;'></th>
-      <th>STATUS</th><th>PAIR</th><th>SCORE</th><th>TREND</th>
-      <th>S/R</th><th>SIGNAL</th><th>QUAL</th><th>REASON</th><th>FEEL ({tf})</th><th>GO</th>
-    </tr>
+    <tr><th style='width:20px;'></th><th>STATUS</th><th>PAIR</th><th>SCORE</th><th>TREND</th>
+      <th>S/R</th><th>SIGNAL</th><th>QUAL</th><th>REASON</th><th>FEEL ({tf})</th><th>GO</th></tr>
   </thead>
   <tbody>{rows_html}</tbody>
 </table>
 <div style='color:#444;font-size:10px;padding:6px 2px;'>
-  {len(pairs)} pairs · 65%+ strong · 40-65% mid · &lt;40% weak · auto-refresh 0.5s · Click 🔴/🟡 to fetch missing data · Drag ☰ to reorder rows
-</div>"""
+  {len(pairs)} pairs · 65%+ strong · 40-65% mid · &lt;40% weak · auto-refresh 0.5s · 🟢 = all data ready · 🟡 = live candles (WS) but some modules missing · 🔴 = no live candles · Click 🔴/🟡 to fetch missing data · Drag ☰ to reorder rows
+</div>
+{js}"""
     except Exception as e:
         print(f"❌ [Main] Scan error: {e}")
         return f"<p class='err-msg'>Scan error: {e}</p>", 500
 
+@app.route('/predict/<symbol>')
+def predict_route(symbol):
+    """Return JSON prediction for the symbol using brain module."""
+    if not BRAIN_AVAILABLE:
+        return jsonify({"error": "Brain module not available"}), 500
+    try:
+        clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
+        pred = brain_predict(clean)
+        return jsonify(pred)
+    except Exception as e:
+        print(f"[Predict] Error for {symbol}: {e}")
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+# Keep old /go route unchanged (for compatibility)
 @app.route('/go')
 def go():
     market = request.args.get('market', '')
@@ -203,14 +282,45 @@ def refresh():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# ==================== HEADER CALLS ROUTE ====================
 @app.route('/calls')
 def calls():
     try:
-        stats = sys_engine.get_call_stats()
-        total = sum(stats.values())
-        html  = (f"<div style='color:#888;font-size:11px;padding:4px 8px;'>"
-                 f"REST calls — " + " | ".join(f"{k}: {v}" for k,v in stats.items())
-                 + f" | <b>Total: {total}</b></div>")
+        rest_stats = sys_engine.get_call_stats()
+        try:
+            from Groups.group_z.Z01_news import get_api_stats
+            news_stats = get_api_stats()
+        except Exception as e:
+            news_stats = {}
+            print(f"[Main] Could not import news API stats: {e}")
+        all_stats = {**rest_stats, **news_stats}
+        total = sum(all_stats.values())
+        items = list(all_stats.items())
+        mid = (len(items) + 1) // 2
+        left_items = items[:mid]
+        right_items = items[mid:]
+        rows_html = ""
+        for i in range(max(len(left_items), len(right_items))):
+            left = left_items[i] if i < len(left_items) else None
+            right = right_items[i] if i < len(right_items) else None
+            rows_html += "<tr>"
+            if left:
+                rows_html += f"<td style='padding:1px 6px; font-size:10px;'>{left[0]}</td><td style='padding:1px 6px; text-align:right; font-size:10px;'>{left[1]}</td>"
+            else:
+                rows_html += "<td style='padding:1px 6px;'></td><td style='padding:1px 6px;'></td>"
+            if right:
+                rows_html += f"<td style='padding:1px 6px; font-size:10px;'>{right[0]}</td><td style='padding:1px 6px; text-align:right; font-size:10px;'>{right[1]}</td>"
+            else:
+                rows_html += "<td style='padding:1px 6px;'></td><td style='padding:1px 6px;'></td>"
+            rows_html += "</tr>"
+        rows_html += f"<tr style='border-top:1px solid rgba(180,160,255,0.3);'><td colspan='2' style='padding:1px 6px; font-size:10px;'><b>Total</b></td><td colspan='2' style='padding:1px 6px; text-align:right; font-size:10px;'><b>{total}</b></td></tr>"
+        html = f"""
+        <div style='color:#ccc; font-size:10px; padding:2px 6px;'>
+            <table style='border-collapse:collapse; background:transparent; border-radius:4px; width:auto;'>
+                {rows_html}
+              </table>
+        </div>
+        """
         return html
     except Exception as e:
         return f"<span style='color:red'>{e}</span>", 500
@@ -221,7 +331,7 @@ def fill():
     if not symbol:
         return jsonify({"error": "No symbol"}), 400
     try:
-        sys_engine.fill_single(symbol)
+        sys_engine.call_single(symbol)
         return jsonify({"status": "started", "symbol": symbol})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -231,8 +341,29 @@ def fill_status():
     symbol = request.args.get('symbol', '')
     if not symbol:
         return jsonify({"error": "No symbol"}), 400
-    status = sys_engine.get_fill_status(symbol)
+    clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
+    status = sys_engine.get_fill_status(clean)
     return jsonify(status)
+
+# ==================== MASTER ANALYSIS ROUTE ====================
+@app.route('/master')
+def master():
+    symbol = request.args.get('symbol', '')
+    if not symbol:
+        return jsonify({"error": "No symbol"}), 400
+    try:
+        from Groups.group_x.X50_master import generate_master
+        content = generate_master(symbol)
+        if content.startswith("Error"):
+            return jsonify({"error": content}), 500
+        return jsonify({"analysis": content})
+    except ImportError:
+        return jsonify({"error": "Master module not available"}), 500
+    except Exception as e:
+        print(f"[Master] Error: {e}")
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+# ========================================================================
 
 @app.route('/check_file')
 def check_file():
@@ -242,26 +373,147 @@ def check_file():
         return jsonify({"exists": False}), 400
     clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
     base_dir = os.path.join(os.path.dirname(__file__), "market_data", "binance", "symbols")
+    
     if file_type == 'candles':
-        filename = f"{clean.lower()}.tsv"
+        db_path = os.path.join(base_dir, f"{clean.lower()}.db")
+    elif file_type == 'volprofile':
+        db_path = os.path.join(base_dir, f"{clean.lower()}_volProfile.db")
+    elif file_type == 'depth':
+        db_path = os.path.join(base_dir, f"{clean.lower()}_depth.db")
     else:
-        filename = f"{clean.lower()}_{file_type}.tsv"
-    filepath = os.path.join(base_dir, filename)
-    exists = os.path.exists(filepath)
-    return jsonify({"exists": exists})
+        db_path = os.path.join(base_dir, f"{clean.lower()}_{file_type}.db")
+    
+    exists = os.path.exists(db_path)
+    modified = None
+    if exists:
+        modified = int(os.path.getmtime(db_path) * 1000)
+    return jsonify({"exists": exists, "modified": modified})
 
 @app.route('/data/<symbol>/<data_type>')
 def view_data(symbol, data_type):
     clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
     base_dir = os.path.join(os.path.dirname(__file__), "market_data", "binance", "symbols")
+    
     if data_type == 'candles':
-        filename = f"{clean.lower()}.tsv"
+        db_path = os.path.join(base_dir, f"{clean.lower()}.db")
+    elif data_type == 'volprofile':
+        db_path = os.path.join(base_dir, f"{clean.lower()}_volProfile.db")
+    elif data_type == 'depth':
+        db_path = os.path.join(base_dir, f"{clean.lower()}_depth.db")
+    elif data_type == 'derivative':
+        db_path = os.path.join(base_dir, f"{clean.lower()}_derivative.db")
+    elif data_type == 'liquidations':
+        db_path = os.path.join(base_dir, f"{clean.lower()}_liquidations.db")
+    elif data_type == 'mstructure':
+        db_path = os.path.join(base_dir, f"{clean.lower()}_mstructure.db")
     else:
-        filename = f"{clean.lower()}_{data_type}.tsv"
-    filepath = os.path.join(base_dir, filename)
-    if not os.path.exists(filepath):
-        return f"File not found: {filename}", 404
-    return send_file(filepath, as_attachment=False, mimetype='text/plain')
+        db_path = os.path.join(base_dir, f"{clean.lower()}_{data_type}.db")
+    
+    if not os.path.exists(db_path):
+        return f"File not found: {os.path.basename(db_path)}", 404
+    
+    try:
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        
+        if data_type == 'candles':
+            cur = conn.execute("SELECT * FROM candles_summary ORDER BY timeframe, timestamp_ms")
+            lines = [json.dumps(dict(row)) for row in cur]
+        elif data_type == 'volprofile':
+            lines = []
+            tables = [
+                'developing_poc', 'daily_profiles', 'untested_pocs', 'prediction_context',
+                'intraday_profiles', 'developing_vah_val', 'shape_interpretation', 'multi_tf_confluence'
+            ]
+            for table in tables:
+                try:
+                    cur = conn.execute(f"SELECT * FROM {table}")
+                    for row in cur:
+                        lines.append(json.dumps(dict(row)))
+                except sqlite3.OperationalError:
+                    pass
+            if not lines:
+                lines = ['{"info": "No volProfile data available"}']
+        elif data_type == 'depth':
+            lines = []
+            cur = conn.execute("SELECT * FROM depth_summary ORDER BY run_id DESC LIMIT 1")
+            for row in cur:
+                lines.append(json.dumps(dict(row)))
+            cur = conn.execute("SELECT side, target_pct, price FROM depth_tail_percentiles ORDER BY side, target_pct")
+            for row in cur:
+                lines.append(json.dumps(dict(row)))
+            cur = conn.execute("SELECT side, levels_json FROM depth_top")
+            for row in cur:
+                lines.append(json.dumps({"side": row['side'], "top25": json.loads(row['levels_json'])}))
+            cur = conn.execute("SELECT side, min_price, max_price, avg_price, total_volume, avg_volume, count, vwap, std_dev FROM depth_tail_stats")
+            for row in cur:
+                lines.append(json.dumps(dict(row)))
+            cur = conn.execute("SELECT * FROM meta")
+            for row in cur:
+                lines.append(json.dumps(dict(row)))
+            if not lines:
+                lines = ['{"info": "No depth data available"}']
+        elif data_type == 'derivative':
+            lines = []
+            cur = conn.execute("SELECT * FROM derivative_summary ORDER BY run_id DESC LIMIT 1")
+            for row in cur:
+                lines.append(json.dumps(dict(row)))
+            cur = conn.execute("SELECT timestamp, oi_value FROM derivative_oi_history ORDER BY timestamp")
+            for row in cur:
+                lines.append(json.dumps(dict(row)))
+            cur = conn.execute("SELECT timestamp, long_short_ratio, long_account, short_account FROM derivative_ls_history ORDER BY timestamp")
+            for row in cur:
+                lines.append(json.dumps(dict(row)))
+            cur = conn.execute("SELECT timestamp, funding_rate FROM derivative_funding_history ORDER BY timestamp")
+            for row in cur:
+                lines.append(json.dumps(dict(row)))
+            cur = conn.execute("SELECT price, volume FROM derivative_liquidation_levels ORDER BY seq")
+            for row in cur:
+                lines.append(json.dumps(dict(row)))
+            cur = conn.execute("SELECT * FROM meta")
+            for row in cur:
+                lines.append(json.dumps(dict(row)))
+            if not lines:
+                lines = ['{"info": "No derivative data available"}']
+        elif data_type == 'liquidations':
+            lines = []
+            cursor = conn.cursor()
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+            tables = cursor.fetchall()
+            for table in tables:
+                table_name = table[0]
+                cur = conn.execute(f"SELECT * FROM {table_name}")
+                for row in cur:
+                    lines.append(json.dumps(dict(row)))
+            if not lines:
+                lines = ['{"info": "No liquidations data available"}']
+        elif data_type == 'mstructure':
+            lines = []
+            cursor = conn.cursor()
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+            tables = cursor.fetchall()
+            for table in tables:
+                table_name = table[0]
+                cur = conn.execute(f"SELECT * FROM {table_name}")
+                for row in cur:
+                    lines.append(json.dumps(dict(row)))
+            if not lines:
+                lines = ['{"info": "No market structure data available"}']
+        else:
+            try:
+                cur = conn.execute("SELECT * FROM main")
+                lines = [json.dumps(dict(row)) for row in cur]
+            except sqlite3.OperationalError:
+                lines = []
+        
+        conn.close()
+        content = "\n".join(lines)
+        return content, 200, {'Content-Type': 'text/plain; charset=utf-8'}
+    except Exception as e:
+        print(f"[ERROR] /data/{symbol}/{data_type}: {e}")
+        import traceback
+        traceback.print_exc()
+        return f"Error reading DB: {e}", 500
 
 @app.route('/file_info')
 def file_info():
@@ -271,48 +523,43 @@ def file_info():
     clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
     base_dir = os.path.join(os.path.dirname(__file__), "market_data", "binance", "symbols")
     
-    def count_rows(filename):
-        filepath = os.path.join(base_dir, filename)
-        if not os.path.exists(filepath):
+    def get_db_row_count(db_name, table='main'):
+        if db_name == 'candles':
+            db_path = os.path.join(base_dir, f"{clean.lower()}.db")
+        else:
+            db_path = os.path.join(base_dir, f"{clean.lower()}_{db_name}.db")
+        if not os.path.exists(db_path):
             return 0
         try:
-            with open(filepath, 'r') as f:
-                lines = f.readlines()
-            return max(0, len(lines) - 1)  # subtract header
+            conn = sqlite3.connect(db_path)
+            if db_name == 'candles':
+                cur = conn.execute("SELECT COUNT(*) FROM candles_summary")
+            elif db_name == 'volprofile':
+                cur = conn.execute("SELECT COUNT(*) FROM daily_profiles")
+            elif db_name == 'depth':
+                cur = conn.execute("SELECT COUNT(*) FROM depth_summary")
+            else:
+                cur = conn.execute(f"SELECT COUNT(*) FROM {table}")
+            count = cur.fetchone()[0]
+            conn.close()
+            return count
         except:
             return 0
     
-    # Existing file types
-    candles_rows = count_rows(f"{clean.lower()}.tsv")
-    cvd_rows = count_rows(f"{clean.lower()}_cvd.tsv")
-    depth_rows = count_rows(f"{clean.lower()}_depth.tsv")
-    derivative_rows = count_rows(f"{clean.lower()}_derivative.tsv")
-    correlation_rows = count_rows(f"{clean.lower()}_correlation.tsv")
-    liquidations_rows = count_rows(f"{clean.lower()}_liquidations.tsv")
-    
-    # New file types (added for UI buttons)
-    macro_rows = count_rows(f"{clean.lower()}_macro.tsv")
-    sessions_rows = count_rows(f"{clean.lower()}_sessions.tsv")
-    sentiment_rows = count_rows(f"{clean.lower()}_sentiment.tsv")
-    volProfile_rows = count_rows(f"{clean.lower()}_volProfile.tsv")
-    mstructure_rows = count_rows(f"{clean.lower()}_mstructure.tsv")
-    onchain_rows = count_rows(f"{clean.lower()}_onchain.tsv")
-    tick_rows = count_rows(f"{clean.lower()}_tick.tsv")
-    
     return jsonify({
-        "candles": candles_rows,
-        "cvd": cvd_rows,
-        "depth": depth_rows,
-        "derivative": derivative_rows,
-        "correlation": correlation_rows,
-        "liquidations": liquidations_rows,
-        "macro": macro_rows,
-        "sessions": sessions_rows,
-        "sentiment": sentiment_rows,
-        "volProfile": volProfile_rows,
-        "mstructure": mstructure_rows,
-        "onchain": onchain_rows,
-        "tick": tick_rows
+        "candles": get_db_row_count('candles'),
+        "volProfile": get_db_row_count('volprofile'),
+        "depth": get_db_row_count('depth'),
+        "cvd": get_db_row_count('cvd'),
+        "derivative": get_db_row_count('derivative'),
+        "correlation": get_db_row_count('correlation'),
+        "liquidations": get_db_row_count('liquidations'),
+        "macro": get_db_row_count('macro'),
+        "sessions": get_db_row_count('sessions'),
+        "sentiment": get_db_row_count('sentiment'),
+        "mstructure": get_db_row_count('mstructure'),
+        "onchain": get_db_row_count('onchain'),
+        "tick": get_db_row_count('tick')
     })
 
 @app.route('/mem')
@@ -332,7 +579,7 @@ def mem():
 def favicon():
     return '', 204
 
-# ── Result renderers ──────────────────────────────────────────────────────────
+# ── Result renderers (unchanged) ──────────────────────────────────────────
 def _render_a_result(r: dict, pair: str, market: str, tf: str) -> str:
     a_score  = r.get("a_score",  "NA")
     a_signal = r.get("a_signal", "WAIT")
