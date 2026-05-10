@@ -1,140 +1,172 @@
 import os
-import json
+import csv
 import datetime
+from collections import defaultdict
 
-TARGET_DIR  = '/storage/emulated/0/Android/data/org.qpython.qpy3/My Automation'
-OUTPUT_FILE = os.path.join(TARGET_DIR, 'project_summary_compact.txt')
+TARGET_DIR = '/storage/emulated/0/Android/data/org.qpython.qpy3/My Automation'
+OUTPUT_TSV = os.path.join(TARGET_DIR, 'balanced_summary.tsv')
 
-SKIP_DIRS  = {'__pycache__', '.git', 'node_modules', '.idea', 'logs'}
-SKIP_FILES = {'project_summary.txt', 'project_short_logic.txt', 'project_summary_full.txt', 'project_summary_compact.txt'}
-MAX_LINES_PER_FILE = 50
-MAX_JSON_CONFIGS = 5
+SKIP_DIRS = {'__pycache__', '.git', 'node_modules', '.idea', 'logs'}
+SKIP_FILES = {'balanced_summary.tsv'}
+
+# Detailed limits for Python
+MAX_PY_LINES = 200
+MAX_CLASSES = 10
+MAX_FUNCS = 10
+MAX_IMPORTS = 8
+MAX_LOGIC = 10
+
+# Limits for TSV preview (non-market_data)
+MAX_TSV_PREVIEW_ROWS = 3
+MAX_TSV_COLS = 6
+
+# Limits for market_data summary
+MARKET_DATA_SUMMARY_FILES = 5   # example files per market
 
 def fmt_size(size):
     if size > 1024*1024:
         return f"{round(size/(1024*1024),1)} MB"
-    if size > 1024:
-        return f"{round(size/1024,1)} KB"
-    return f"{size} B"
+    return f"{round(size/1024,1)} KB"
 
-def extract_py_summary(lines):
-    """Extract only essential info from Python file."""
-    classes = [l.strip() for l in lines if l.strip().startswith('class ')][:5]
-    funcs = [l.strip() for l in lines if l.strip().startswith('def ')][:5]
-    imports = [l.strip() for l in lines if l.strip().startswith(('import ', 'from '))][:5]
-    logic = []
-    for l in lines:
-        s = l.strip()
-        if any(k in s.lower() for k in ['rsi', 'ema', 'macd', 'score', 'signal', 'buy', 'sell']):
+def extract_py_details(lines):
+    classes, funcs, imports, logic = [], [], [], []
+    for line in lines:
+        s = line.strip()
+        if s.startswith('class ') and len(classes) < MAX_CLASSES:
+            classes.append(s.split('(')[0].replace('class ', ''))
+        elif s.startswith('def ') and len(funcs) < MAX_FUNCS:
+            funcs.append(s.split('(')[0].replace('def ', ''))
+        elif s.startswith(('import ', 'from ')) and len(imports) < MAX_IMPORTS:
+            imports.append(s[:60])
+        elif any(k in s.lower() for k in ['rsi','ema','macd','signal','buy','sell','trend','strategy']) and len(logic) < MAX_LOGIC:
             logic.append(s[:80])
-            if len(logic) >= 5:
-                break
-    return classes, funcs, imports, logic
+    return '|'.join(classes), '|'.join(funcs), '|'.join(imports), '|'.join(logic)
+
+def tsv_preview(filepath):
+    try:
+        with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+            reader = csv.reader(f, delimiter='\t')
+            header = next(reader)[:MAX_TSV_COLS]
+            sample_rows = []
+            for i, row in enumerate(reader):
+                if i < MAX_TSV_PREVIEW_ROWS:
+                    sample_rows.append(';'.join(row[:3]))
+                else:
+                    break
+            return f"{len(header)} cols: {','.join(header)} | sample: {' | '.join(sample_rows)}"[:150]
+    except:
+        return ""
+
+def log_preview(filepath):
+    try:
+        with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+            lines = f.readlines()
+            last5 = ' '.join(l.strip()[:50] for l in lines[-5:])
+            errors = [l.strip()[:60] for l in lines if 'error' in l.lower()]
+            return f"last: {last5[:100]} | err: {';'.join(errors[:2])}"[:120]
+    except:
+        return ""
+
+def txt_preview(filepath):
+    try:
+        with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+            first3 = [f.readline().strip()[:60] for _ in range(3)]
+            return ' | '.join(first3)[:120]
+    except:
+        return ""
+
+def summarize_market_data(market_path):
+    """Returns list of TSV rows summarizing market_data subfolders."""
+    rows = []
+    if not os.path.exists(market_path):
+        return rows
+    for sub in sorted(os.listdir(market_path)):
+        sub_path = os.path.join(market_path, sub)
+        if not os.path.isdir(sub_path):
+            continue
+        files = [f for f in os.listdir(sub_path) if f.endswith('.tsv')]
+        if not files:
+            continue
+        total_size = sum(os.path.getsize(os.path.join(sub_path, f)) for f in files)
+        sample_files = files[:MARKET_DATA_SUMMARY_FILES]
+        rows.append([
+            f"market_data/{sub}",
+            "DIR_SUMMARY",
+            fmt_size(total_size),
+            f"{len(files)} TSV files",
+            "", "", "", "",  # py fields empty
+            f"examples: {', '.join(sample_files)}",
+            "", ""
+        ])
+    return rows
 
 def scan():
-    out = []
-    out.append("="*80)
-    out.append("COMPACT PROJECT SCAN")
-    out.append(f"Time: {datetime.datetime.now()}")
-    out.append("="*80)
+    all_rows = []
+    market_rows = []
+    other_rows = []
+    market_data_path = os.path.join(TARGET_DIR, 'market_data')
 
-    # Folder structure (only important folders, limited files)
-    out.append("\n[FOLDER STRUCTURE]")
-    total_files = 0
+    # First, summarize market_data folder (no per-file rows)
+    if os.path.exists(market_data_path):
+        market_rows = summarize_market_data(market_data_path)
+
+    # Now walk the rest, but skip market_data folder entirely to avoid repetition
     for root, dirs, files in os.walk(TARGET_DIR):
-        dirs[:] = sorted([d for d in dirs if d not in SKIP_DIRS and not d.startswith('.')])
-        level = root.replace(TARGET_DIR, '').count(os.sep)
-        indent = "  " * level
-        folder = os.path.basename(root) or 'My Automation'
-        out.append(indent + folder + "/")
-        sub = "  " * (level + 1)
-        # Show at most 20 files per folder
-        file_list = sorted([f for f in files if f not in SKIP_FILES])[:20]
-        for f in file_list:
-            fpath = os.path.join(root, f)
-            size = os.path.getsize(fpath)
-            out.append(sub + f + f"  [{fmt_size(size)}]")
-            total_files += 1
-        if len(files) > 20:
-            out.append(sub + f"... and {len(files)-20} more files")
-    out.append(f"\nTotal files shown: {total_files}")
-
-    # Architecture (shortened)
-    out.append("\n[ARCHITECTURE]")
-    out.append("""
-LAYERS: Z (fast scan) → A (single pair) → D (deep)
-PLATFORMS: Binance, Finnhub, IQ Option, Quotex
-FLOW: WS connect → 1hr data → resampling (1m→4h)
-CONFIGS: group_c/configs/<market>/<pair>.json
-""")
-
-    # File details (only Python and JSON, limited)
-    out.append("\n[FILE DETAILS]")
-    for root, dirs, files in os.walk(TARGET_DIR):
-        dirs[:] = sorted([d for d in dirs if d not in SKIP_DIRS])
+        # Skip market_data folder and other skip dirs
+        if root == market_data_path or market_data_path in root:
+            continue
+        dirs[:] = [d for d in dirs if d not in SKIP_DIRS and not d.startswith('.')]
         for fname in files:
-            if fname in SKIP_FILES or not fname.endswith(('.py', '.json')):
+            if fname in SKIP_FILES:
                 continue
             fpath = os.path.join(root, fname)
             rel = os.path.relpath(fpath, TARGET_DIR)
-            out.append(f"\n--- {rel} ---")
-            try:
-                with open(fpath, 'r', encoding='utf-8', errors='ignore') as f:
-                    lines = f.readlines()[:MAX_LINES_PER_FILE]
-                if fname.endswith('.py'):
-                    classes, funcs, imports, logic = extract_py_summary(lines)
-                    if classes: out.append("Classes: " + ", ".join(classes))
-                    if funcs: out.append("Functions: " + ", ".join(funcs))
-                    if imports: out.append("Imports: " + ", ".join(imports))
-                    if logic: out.append("Key Logic: " + " | ".join(logic))
-                else:  # JSON
-                    data = json.loads(''.join(lines))
-                    out.append(json.dumps(data, indent=2)[:800])
-                    if len(json.dumps(data)) > 800:
-                        out.append("... (truncated)")
-            except Exception as e:
-                out.append(f"Error: {e}")
+            ext = os.path.splitext(fname)[1].lower()
+            size = os.path.getsize(fpath)
+            mtime = datetime.datetime.fromtimestamp(os.path.getmtime(fpath)).strftime('%Y-%m-%d %H:%M')
 
-    # Configs (limited to 5 examples)
-    out.append("\n[CONFIG EXAMPLES]")
-    cfg_root = os.path.join(TARGET_DIR, 'Groups', 'group_c', 'configs')
-    if os.path.exists(cfg_root):
-        examples = []
-        for mkt in os.listdir(cfg_root):
-            mkt_path = os.path.join(cfg_root, mkt)
-            if os.path.isdir(mkt_path):
-                for cfg in os.listdir(mkt_path)[:2]:  # up to 2 per market
-                    examples.append(os.path.join(mkt_path, cfg))
-                if len(examples) >= MAX_JSON_CONFIGS:
-                    break
-        for ex in examples:
-            try:
-                with open(ex) as f:
-                    data = json.load(f)
-                out.append(f"\n{os.path.basename(ex)}:")
-                out.append(json.dumps(data, indent=2)[:500])
-            except:
-                pass
-    else:
-        out.append("Configs not found")
+            # Defaults
+            classes=funcs=imports=logic=''
+            tsv_info=log_info=txt_info=''
 
-    # Market data summary
-    out.append("\n[MARKET DATA]")
-    md = os.path.join(TARGET_DIR, 'market_data')
-    if os.path.exists(md):
-        for plat in os.listdir(md):
-            plat_path = os.path.join(md, plat)
-            if os.path.isdir(plat_path):
-                count = len(os.listdir(plat_path))
-                out.append(f"{plat}: {count} files")
-    else:
-        out.append("Not created yet")
+            if ext == '.py':
+                try:
+                    with open(fpath, 'r', encoding='utf-8', errors='ignore') as f:
+                        lines = f.readlines()[:MAX_PY_LINES]
+                    classes, funcs, imports, logic = extract_py_details(lines)
+                except:
+                    pass
+            elif ext == '.tsv':
+                tsv_info = tsv_preview(fpath)
+            elif ext == '.log':
+                log_info = log_preview(fpath)
+            elif ext == '.txt':
+                txt_info = txt_preview(fpath)
 
-    # Save
-    text = "\n".join(out)
-    with open(OUTPUT_FILE, 'w', encoding='utf-8') as f:
-        f.write(text)
-    print(f"Compact summary saved: {OUTPUT_FILE} ({len(text)//1024} KB)")
+            other_rows.append([
+                rel, ext[1:] if ext else 'txt', fmt_size(size), mtime,
+                classes, funcs, imports, logic,
+                tsv_info, log_info, txt_info
+            ])
+
+    # Limit other files to 100 rows (to keep output small)
+    if len(other_rows) > 100:
+        other_rows = other_rows[:100]
+
+    # Combine: market summary rows first, then other files
+    all_rows = market_rows + other_rows
+
+    # Write TSV
+    with open(OUTPUT_TSV, 'w', encoding='utf-8', newline='') as tsvfile:
+        writer = csv.writer(tsvfile, delimiter='\t')
+        writer.writerow(['FilePath', 'Type', 'Size', 'Modified',
+                         'Classes', 'Functions', 'Imports', 'KeyLogic',
+                         'TSV_Preview', 'Log_Preview', 'TXT_Preview'])
+
+        for row in all_rows:
+            writer.writerow(row)
+
+    print(f"✅ Balanced summary saved: {OUTPUT_TSV} ({os.path.getsize(OUTPUT_TSV)//1024} KB) - {len(all_rows)} rows (market summarized)")
 
 if __name__ == "__main__":
     scan()
