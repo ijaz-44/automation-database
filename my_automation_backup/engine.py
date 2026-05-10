@@ -1,4 +1,3 @@
-# engine.py
 import os
 import sys
 from typing import Dict, Any, List
@@ -15,18 +14,20 @@ for p in [BASE_DIR,
     if p not in sys.path:
         sys.path.insert(0, p)
 
-# Group Z
-try:
-    from Z01_trend    import score as z01_score
-    from Z02_volume   import score as z02_score
-    from Z03_momentum import score as z03_score
-    _z_ok = True
-    print("✅ [engine] Z modules loaded")
-except Exception as e:
-    _z_ok = False
-    print(f"❌ [engine] Z modules: {e}")
+# Group Z – only Z01_news
+_z_news_ok = False
+news_score_func = None
 
-# Group A
+try:
+    from Z01_news import get_news_score as news_score_func
+    _z_news_ok = True
+    print("✅ [engine] Z01_news loaded")
+except Exception as e:
+    print(f"❌ [engine] Z01_news import failed: {e}")
+
+# No other Z modules – no dummy functions
+
+# Group A – unchanged
 try:
     from A01_structure  import confirm as a01_confirm
     from A02_indicators import confirm as a02_confirm
@@ -38,7 +39,7 @@ except Exception as e:
     _a_ok = False
     print(f"❌ [engine] A modules: {e}")
 
-# Import config manager
+# Config manager – unchanged
 try:
     from Groups.group_c.config_manager import get_config_loader
     _config_available = True
@@ -67,56 +68,27 @@ class TradingEngine:
             if not rows or len(rows) < 20:
                 return self._na("Insufficient data")
             
-            # Get config from manager (or fallback defaults)
             if self.config_loader:
                 cfg = self.config_loader.get(symbol, market, interval)
-                weights_z = cfg.get("weights_z", {})
                 thresholds_z = cfg.get("thresholds_z", {})
                 manip_cfg = cfg.get("manipulation", {})
             else:
-                # Fallback default
-                weights_z = {"trend": 0.35, "volume": 0.20, "momentum": 0.45}
                 thresholds_z = {"buy": 65, "sell": 35, "strong_buy": 80, "strong_sell": 20}
                 manip_cfg = {"enabled": False, "penalty": -20, "min_wick_ratio": 0.6, "volume_spike_threshold": 2.5}
             
-            if not weights_z or not thresholds_z:
-                return self._na("Missing weights/thresholds")
+            if not thresholds_z:
+                return self._na("Missing thresholds")
             
-            regime = self._detect_regime(rows)
-            dw = self._dynamic_weights(weights_z, regime)
+            # Only news score
+            news = self._run_safe(news_score_func, _z_news_ok, symbol, interval, rows,
+                                  default={"signal":"WAIT","score_mod":0,"reason":"News N/A"})
             
-            z01 = self._run_safe(z01_score, _z_ok, symbol, interval, rows,
-                                 default={"signal":"WAIT","trend":"FLAT","score":40,"reason":"Z01 N/A"})
-            z02 = self._run_safe(z02_score, _z_ok, symbol, interval, rows,
-                                 default={"score_mod":0,"label":"N/A","reason":"Z02 N/A"})
-            z03 = self._run_safe(z03_score, _z_ok, symbol, interval, rows,
-                                 default={"signal":"WAIT","score_mod":0,"strength":"UNKNOWN","reason":"Z03 N/A"})
-            
-            buy_pts = sell_pts = 0
-            tw = sum(int(v*100) for v in dw.values()) or 1
-            
-            if z01.get("signal") == "BUY":
-                buy_pts += int(dw.get("trend",0)*100)
-            elif z01.get("signal") == "SELL":
-                sell_pts += int(dw.get("trend",0)*100)
-            
-            vm = z02.get("score_mod", 0)
-            if vm > 0:
-                buy_pts += min(vm, int(dw.get("volume",0)*100))
-            elif vm < 0:
-                sell_pts += min(-vm, int(dw.get("volume",0)*100))
-            
-            mm = z03.get("score_mod", 0)
-            if mm > 0:
-                buy_pts += min(mm, int(dw.get("momentum",0)*100))
-            elif mm < 0:
-                sell_pts += min(-mm, int(dw.get("momentum",0)*100))
-            
-            if buy_pts > sell_pts:
-                score = int(50 + (buy_pts / tw) * 45)
+            nm = news.get("score_mod", 0)
+            if nm > 0:
+                score = 50 + min(nm, 30)  # max +30
                 raw_sig = "BUY"
-            elif sell_pts > buy_pts:
-                score = int(50 - (sell_pts / tw) * 45)
+            elif nm < 0:
+                score = 50 - min(-nm, 30)
                 raw_sig = "SELL"
             else:
                 score = 50
@@ -146,36 +118,33 @@ class TradingEngine:
                     signal = "WAIT"
             
             stable_signal = self._stabilise(symbol, signal)
-            quality = self._quality(score, stable_signal, regime, z01, z02, z03)
+            # Quality based only on news (since no volume/momentum)
+            quality = self._quality_news_only(score, stable_signal)
             sr_pos = self._sr_position(rows)
             
-            reasons = [r for r in [
-                z01.get("reason","")[:20] if z01.get("signal") != "WAIT" else "",
-                z02.get("reason","")[:15] if z02.get("label") not in ["N/A","ERROR"] else "",
-                z03.get("reason","")[:15] if z03.get("strength") not in ["UNKNOWN","ERROR"] else "",
-                manip_note[:20] if manip_note else "",
-            ] if r]
-            reason = " + ".join(reasons) or "Mixed signals"
+            reason = news.get("reason", "")[:30] if news.get("score_mod") != 0 else "News neutral"
+            if manip_note:
+                reason += " + " + manip_note[:20]
             
             return {
                 "score": score,
                 "signal": stable_signal,
-                "trend": z01.get("trend", "FLAT"),
+                "trend": "--",
                 "sr_position": sr_pos,
-                "regime": regime,
+                "regime": self._detect_regime(rows),
                 "quality": quality,
                 "reason": reason,
-                "details": {"trend": z01, "volume": z02, "momentum": z03}
+                "details": {"news": news}
             }
         except Exception as e:
             return self._na(f"Z-error: {str(e)[:40]}")
 
     def get_a_score(self, symbol: str, market: str, interval: str, rows: List, z_result: Dict) -> Dict[str, Any]:
+        # (unchanged – keep exactly as in your original)
         try:
             if not rows or len(rows) < 20:
                 return self._na_a("Insufficient data")
             
-            # Get config from manager
             if self.config_loader:
                 cfg = self.config_loader.get(symbol, market, interval)
                 weights_a = cfg.get("weights_a", {})
@@ -271,12 +240,10 @@ class TradingEngine:
         except Exception as e:
             return self._na_a(f"A-error: {str(e)[:40]}")
 
-    # get_d_score removed – no longer needed (Group D removed)
-
-    # ===================== Helper methods (unchanged) =====================
+    # -------------------- Helper methods (most unchanged, added quality_news_only) --------------------
     @staticmethod
     def _run_safe(fn, available, *args, default=None):
-        if not available:
+        if not available or fn is None:
             return default or {}
         try:
             try:
@@ -318,17 +285,17 @@ class TradingEngine:
 
     @staticmethod
     def _dynamic_weights(base_weights, regime):
+        # Not used anymore, but kept for compatibility
         w = dict(base_weights)
         if regime == "trending":
-            w["trend"] = min(1.0, w.get("trend",0.30) * 1.30)
-            w["momentum"] = w.get("momentum",0.30) * 0.85
+            w["momentum"] = w.get("momentum", 0.50) * 1.20
+            w["volume"] = w.get("volume", 0.30) * 0.80
         elif regime == "ranging":
-            w["momentum"] = min(1.0, w.get("momentum",0.30) * 1.20)
-            w["trend"] = w.get("trend",0.30) * 0.80
+            w["momentum"] = w.get("momentum", 0.50) * 0.80
+            w["volume"] = w.get("volume", 0.30) * 1.20
         elif regime == "volatile":
-            w["momentum"] = min(1.0, w.get("momentum",0.30) * 1.40)
-            w["trend"] = w.get("trend",0.30) * 0.70
-            w["volume"] = w.get("volume",0.20) * 0.80
+            w["momentum"] = w.get("momentum", 0.50) * 0.70
+            w["volume"] = w.get("volume", 0.30) * 1.30
         total = sum(w.values()) or 1
         return {k: round(v/total,4) for k,v in w.items()}
 
@@ -368,8 +335,20 @@ class TradingEngine:
             return "SELL"
         return "WAIT"
 
+    def _quality_news_only(self, score, signal):
+        # Simplified quality based on score and signal
+        if signal == "WAIT":
+            return "LOW"
+        if score >= 75:
+            return "HIGH"
+        elif score >= 60:
+            return "MED"
+        else:
+            return "LOW"
+
     @staticmethod
     def _quality(score, signal, regime, z01, z02, z03):
+        # Kept for compatibility but not used
         if signal == "WAIT":
             return "LOW"
         pts = 0
@@ -378,8 +357,6 @@ class TradingEngine:
         elif score >= 60:
             pts += 1
         if regime == "trending":
-            pts += 1
-        if z01.get("signal") not in ["WAIT","ERROR"]:
             pts += 1
         if z02.get("label") not in ["N/A","ERROR"]:
             pts += 1
@@ -394,7 +371,7 @@ class TradingEngine:
     @staticmethod
     def _sr_position(rows):
         if len(rows) < 20:
-            return "—"
+            return "--"
         try:
             closes = [r["close"] for r in rows[-50:]]
             highs = [r["high"] for r in rows[-50:]]
@@ -404,15 +381,15 @@ class TradingEngine:
             sup = min(lows)
             rng = res - sup
             if rng <= 0:
-                return "Mid"
+                return "--"
             pos = (cur - sup) / rng
             if pos < 0.25:
                 return "Near Support"
             if pos > 0.75:
                 return "Near Resistance"
-            return "Mid Range"
+            return "--"
         except Exception:
-            return "—"
+            return "--"
 
     @staticmethod
     def _calc_sl_tp(rows, direction, risk_cfg):
@@ -436,7 +413,7 @@ class TradingEngine:
 
     @staticmethod
     def _na(reason):
-        return {"score":"NA","signal":"WAIT","trend":"FLAT","sr_position":"—","regime":"unknown","quality":"LOW","reason":reason,"details":{}}
+        return {"score":"NA","signal":"WAIT","trend":"--","sr_position":"--","regime":"unknown","quality":"LOW","reason":reason,"details":{}}
 
     @staticmethod
     def _na_a(reason):
@@ -451,4 +428,4 @@ def get_engine():
         _engine = TradingEngine()
     return _engine
 
-print("✅ [engine] Loaded OK")
+print("✅ [engine] Loaded OK (only Z01_news, no volume/momentum)")
