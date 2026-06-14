@@ -1,463 +1,351 @@
+#!/usr/bin/env python3
 """
-X13 - Liquidation Data Module (TOON format, Multi‑Resource, Atomic Rename)
-- Tries 6 public APIs in sequence (Coinalyze, CryptoCompare, Binance Futures, Bybit, Deribit, Hyblock)
-- Falls back to next on failure
-- Caches results per symbol+interval for 120 seconds (2 min freshness)
-- Caches daily candles (refreshed once per day)
-- Rate‑limited API calls (1.2 sec between calls)
-- Designed to be instantiated ONCE and reused for all symbols
-- Saves to: market_data/binance/symbols/{symbol}_liquidations.toon
+X13_liquidation_rest.py – Raw Liquidation & Trade Collector (No Data Fallback)
+- If no data, creates .tmp_x file with comment "# No data downloaded"
+- Fast fail (2 retries, 3 sec timeout)
+- All sources kept
 """
 
 import os
+import sys
 import time
-import glob
 import requests
+import hashlib
+import random
+from datetime import datetime, timezone
 from collections import defaultdict
-from datetime import datetime
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SYMBOLS_DIR = os.path.join(BASE_DIR, "market_data", "binance", "symbols")
 os.makedirs(SYMBOLS_DIR, exist_ok=True)
+GLOBAL_LOG = os.path.join(SYMBOLS_DIR, "X13_liquidation.log")
+SESSION = requests.Session()
+SESSION.headers.update({"User-Agent": "Mozilla/5.0"})
 
-LOG_FILE = os.path.join(SYMBOLS_DIR, "liquidation_log.txt")
+SOURCE_LAST_CALL = defaultdict(float)
+SOURCE_MIN_INTERVAL = { "Hyperliquid": 0.5, "dYdX": 0.5, "Bybit": 0.5, "Binance": 0.5, "Bitget": 0.5 }
 
-class LiquidationDataREST:
-    # Singleton instance
-    _instance = None
+def rate_limit(source):
+    now = time.time()
+    last = SOURCE_LAST_CALL[source]
+    if now - last < SOURCE_MIN_INTERVAL.get(source, 0.5):
+        time.sleep(SOURCE_MIN_INTERVAL.get(source, 0.5) - (now - last))
+    SOURCE_LAST_CALL[source] = time.time()
 
-    def __new__(cls, *args, **kwargs):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-        return cls._instance
+def log_issue(symbol, level, msg):
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    line = f"{ts} [{level}] [{symbol}] {msg}"
+    print(line)
+    with open(GLOBAL_LOG, "a", encoding="utf-8") as f:
+        f.write(line + "\n")
 
-    def __init__(self):
-        if hasattr(self, '_initialized'):
-            return
-        self._initialized = True
-        self._last_call = 0
-        self._rate_limit_sec = 1.2          # renamed to avoid conflict with method
-        # Cache for liquidation data: key = (symbol, interval) -> (timestamp, rows)
-        self._liq_cache = {}
-        # Cache for daily candles
-        self._daily_candles_cache = None
-        self._daily_candles_time = 0
-        # Cache for 1m candles (per symbol)
-        self._1m_candles_cache = {}
-        # TTL: 2 minutes for liquidation and 1m candles
-        self._ttl = 120
+def normalize_symbol(sym):
+    sym = sym.upper()
+    if sym.endswith("PERP"):
+        sym = sym[:-4]
+    if not sym.endswith("USDT"):
+        sym = sym + "USDT"
+    return sym
 
-    def _rate_limit(self):
-        now = time.time()
-        elapsed = now - self._last_call
-        if elapsed < self._rate_limit_sec:
-            time.sleep(self._rate_limit_sec - elapsed)
-        self._last_call = time.time()
+def normalize_ts(ts):
+    if ts is None:
+        return int(time.time() * 1000)
+    ts = int(ts)
+    if ts > 10**15:
+        ts = ts // 1000
+    if len(str(ts)) <= 10:
+        ts = ts * 1000
+    return (ts // 1000) * 1000
 
-    def _log(self, msg):
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        line = f"{timestamp} {msg}"
-        print(line)
+def safe_iso_parse(ts_str):
+    if not ts_str:
+        return None
+    try:
+        dt = datetime.fromisoformat(ts_str.replace('Z', '+00:00'))
+        return normalize_ts(int(dt.timestamp() * 1000))
+    except:
         try:
-            with open(LOG_FILE, 'a', encoding='utf-8') as f:
-                f.write(line + "\n")
+            cleaned = ts_str.replace('Z', '').replace('+00:00', '').split('.')[0]
+            dt = datetime.fromisoformat(cleaned).replace(tzinfo=timezone.utc)
+            return normalize_ts(int(dt.timestamp() * 1000))
         except:
-            pass
+            return None
 
-    def _atomic_write(self, path, content):
-        temp = path + ".tmp"
+def fetch_with_retries(source, url, params=None, headers=None, max_retries=2, backoff=0.5):
+    for attempt in range(max_retries):
+        rate_limit(source)
         try:
-            with open(temp, 'w', encoding='utf-8') as f:
-                f.write(content)
-                f.flush()
-                os.fsync(f.fileno())
-            os.rename(temp, path)
-            self._log(f"[ATOMIC] OK -> {os.path.basename(path)}")
-            return True
+            time.sleep(random.uniform(0.1, 0.3) * attempt)
+            resp = SESSION.get(url, params=params, headers=headers, timeout=3)
+            ct = resp.headers.get('Content-Type', '').lower()
+            if resp.status_code == 200 and ('json' in ct or resp.text.startswith('{')):
+                return resp
+            else:
+                log_issue(source, "WARNING", f"HTTP {resp.status_code} (attempt {attempt+1})")
         except Exception as e:
-            if os.path.exists(temp):
-                os.remove(temp)
-            self._log(f"[ATOMIC] FAIL {path}: {e}")
-            return False
+            log_issue(source, "WARNING", f"Error: {type(e).__name__}: {e} (attempt {attempt+1})")
+        if attempt < max_retries - 1:
+            time.sleep(backoff * (2 ** attempt) + random.uniform(0, 0.3))
+    return None
 
-    # ---------- Helper ----------
-    def _to_coin(self, symbol):
-        for suffix in ['USDT', 'BUSD', 'USDC', 'PERP']:
-            if symbol.upper().endswith(suffix):
-                return symbol.upper()[:-len(suffix)]
-        return symbol.upper()
+def quick_post(source, url, json_data=None, max_retries=2):
+    for attempt in range(max_retries):
+        rate_limit(source)
+        try:
+            resp = SESSION.post(url, json=json_data, timeout=3)
+            ct = resp.headers.get('Content-Type', '').lower()
+            if resp.status_code == 200 and ('json' in ct or resp.text.startswith('{')):
+                return resp
+        except Exception as e:
+            log_issue(source, "WARNING", f"POST error: {e} (attempt {attempt+1})")
+        time.sleep(0.5 * (attempt+1))
+    return None
 
-    # ---------- API calls with rate limit ----------
-    def _fetch_coinalyze(self, symbol, interval):
-        self._rate_limit()
-        coin = self._to_coin(symbol)
-        url = "https://api.coinalyze.net/v1/liquidation"
-        headers = {"api_key": "8d7838f9-7111-4d4f-bffd-b83e8d468b60"}
-        for sym_try in [coin, f"Binance:{symbol.upper()}", symbol.upper()]:
-            params = {"symbol": sym_try, "interval": interval, "limit": 120,
-                      "fields": "timestamp,longVolume,shortVolume"}
+NOW_MS = int(time.time() * 1000)
+CUTOFF_MS = NOW_MS - 6 * 3600 * 1000
+def is_within_cutoff(ts): return ts >= CUTOFF_MS
+
+# ---------- Hyperliquid ----------
+def fetch_hyperliquid_true(symbol):
+    source = "Hyperliquid"
+    coin = symbol.upper().replace("USDT", "")
+    payload = {"type": "clearingEvents", "user": "0x0000000000000000000000000000000000000000"}
+    resp = quick_post(source, "https://api.hyperliquid.xyz/info", json_data=payload)
+    if not resp:
+        return []
+    try:
+        raw = resp.json()
+    except:
+        return []
+    if isinstance(raw, list):
+        data = raw
+    elif isinstance(raw, dict):
+        data = raw.get("clearingEvents") or raw.get("data")
+        if isinstance(data, dict):
+            data = data.get("clearingEvents") or data.get("data", [])
+    else:
+        return []
+    if not isinstance(data, list):
+        return []
+    events = []
+    for item in data:
+        if not isinstance(item, dict) or item.get("type") != "liquidation":
+            continue
+        liq = item.get("liquidation", {})
+        if liq.get("coin", "").upper() != coin:
+            continue
+        price = float(liq.get("price", 0))
+        size = float(liq.get("size", 0))
+        side = "short" if liq.get("isBuy") else "long"
+        ts = normalize_ts(int(item.get("time", 0)))
+        if not is_within_cutoff(ts):
+            continue
+        events.append({"ts": ts, "price": price, "usd_volume": price * size,
+                       "side": side, "type": "true_liquidation", "source": "hyperliquid"})
+    log_issue(symbol, "INFO", f"Hyperliquid: {len(events)} events")
+    return events
+
+# ---------- dYdX ----------
+def fetch_dydx_true(symbol):
+    source = "dYdX"
+    coin = symbol.upper().replace("USDT", "")
+    url = f"https://indexer.dydx.trade/v4/perpetualMarkets/{coin}-USD/liquidations"
+    resp = fetch_with_retries(source, url, params={"limit": 200})
+    if not resp:
+        return []
+    try:
+        data = resp.json()
+    except:
+        return []
+    liq_list = data.get("liquidations")
+    if not isinstance(liq_list, list):
+        return []
+    events = []
+    for liq in liq_list:
+        try:
+            price = float(liq.get("price", 0))
+            size = float(liq.get("size", 0))
+            side_raw = liq.get("side", "")
+            side = "long" if side_raw == "LONG" else "short" if side_raw == "SHORT" else None
+            if not side:
+                continue
+            ts = safe_iso_parse(liq.get("createdAt", ""))
+            if ts is None or not is_within_cutoff(ts):
+                continue
+            events.append({"ts": ts, "price": price, "usd_volume": price * size,
+                           "side": side, "type": "true_liquidation", "source": "dydx"})
+        except:
+            continue
+    log_issue(symbol, "INFO", f"dYdX: {len(events)} events")
+    return events
+
+# ---------- Bybit ----------
+def fetch_bybit_true(symbol):
+    source = "Bybit"
+    sym = normalize_symbol(symbol)
+    endpoints = [
+        ("force-orders", "https://api.bybit.com/v5/market/force-orders", {"category": "linear", "symbol": sym, "limit": 200}),
+        ("liquidations", "https://api.bybit.com/v5/market/liquidations", {"category": "linear", "symbol": sym, "limit": 200})
+    ]
+    all_events = []
+    for name, url, params in endpoints:
+        resp = fetch_with_retries(source, url, params)
+        if not resp:
+            continue
+        try:
+            data = resp.json()
+        except:
+            continue
+        if data.get("retCode") != 0 or "result" not in data:
+            continue
+        items = data["result"].get("list", [])
+        if not isinstance(items, list):
+            continue
+        for item in items:
             try:
-                r = requests.get(url, headers=headers, params=params, timeout=10)
-                if r.status_code == 200:
-                    data = r.json()
-                    if data.get("data"):
-                        rows = []
-                        for item in data["data"]:
-                            rows.append({
-                                "ts": item["timestamp"],
-                                "long": float(item.get("longVolume", 0)),
-                                "short": float(item.get("shortVolume", 0))
-                            })
-                        self._log(f"[COINALYZE] {symbol} {interval} -> {len(rows)} rows (using {sym_try})")
-                        return rows
-                else:
-                    self._log(f"[COINALYZE] {sym_try} HTTP {r.status_code}")
-            except Exception as e:
-                self._log(f"[COINALYZE] {sym_try} error: {e}")
-        return []
+                price = float(item.get("price", 0))
+                size = float(item.get("size", 0))
+                side_raw = item.get("side", "")
+                if not side_raw:
+                    continue
+                side = "short" if side_raw == "Buy" else "long" if side_raw == "Sell" else None
+                if not side:
+                    continue
+                ts_raw = int(item.get("updatedTime", 0)) if "updatedTime" in item else int(item.get("time", 0))
+                ts = normalize_ts(ts_raw)
+                if not is_within_cutoff(ts):
+                    continue
+                all_events.append({"ts": ts, "price": price, "usd_volume": price * size,
+                                   "side": side, "type": "true_liquidation", "source": "bybit"})
+            except:
+                continue
+    log_issue(symbol, "INFO", f"Bybit: {len(all_events)} events")
+    return all_events
 
-    def _fetch_cryptocompare(self, symbol, interval):
-        self._rate_limit()
-        coin = self._to_coin(symbol)
-        url = "https://min-api.cryptocompare.com/data/v1/liquidations"
-        params = {"symbol": coin, "limit": 200, "api_key": "2f8a33bc64db22db858d7962112cead0ccc07035f9806adb031ad4ce71743d75"}
+# ---------- Binance trades ----------
+def parse_binance_trades(data):
+    if not isinstance(data, list):
+        return []
+    trades = []
+    for item in data:
         try:
-            r = requests.get(url, params=params, timeout=10)
-            if r.status_code == 200:
-                data = r.json()
-                events = []
-                for item in data.get("Data", []):
-                    events.append({
-                        "ts": item.get("timestamp", 0),
-                        "long": float(item.get("longLiquidatedUsd", 0)),
-                        "short": float(item.get("shortLiquidatedUsd", 0))
-                    })
-                interval_ms = {"1m": 60000, "15m": 900000, "1h": 3600000}[interval]
-                bins = defaultdict(lambda: {"long": 0.0, "short": 0.0})
-                for e in events:
-                    bucket = (e["ts"] // interval_ms) * interval_ms
-                    bins[bucket]["long"] += e["long"]
-                    bins[bucket]["short"] += e["short"]
-                rows = [{"ts": b, "long": v["long"], "short": v["short"]} for b, v in sorted(bins.items())]
-                if rows:
-                    self._log(f"[CRYPTOCOMPARE] {symbol} {interval} -> {len(rows)} rows")
-                    return rows[-120:]
-            else:
-                self._log(f"[CRYPTOCOMPARE] HTTP {r.status_code}")
-        except Exception as e:
-            self._log(f"[CRYPTOCOMPARE] error: {e}")
-        return []
+            trades.append({
+                "ts": normalize_ts(int(item.get("T", 0))),
+                "price": float(item.get("p", 0)),
+                "usd_vol": float(item.get("p", 0)) * float(item.get("q", 0)),
+                "side": "long" if not item.get("m", False) else "short"
+            })
+        except:
+            continue
+    return trades
 
-    def _fetch_binance_futures(self, symbol):
-        self._rate_limit()
-        url = "https://fapi.binance.com/fapi/v1/liquidationOrders"
-        params = {"symbol": symbol.upper(), "limit": 100}
+def fetch_binance_trades(symbol):
+    source = "Binance"
+    sym = normalize_symbol(symbol)
+    resp = fetch_with_retries(source, "https://api.binance.com/api/v3/trades",
+                              params={"symbol": sym, "limit": 1000})
+    if not resp:
+        return []
+    try:
+        data = resp.json()
+    except:
+        return []
+    trades = parse_binance_trades(data)
+    events = []
+    for t in trades:
+        if not is_within_cutoff(t['ts']):
+            continue
+        events.append({"ts": t['ts'], "price": t['price'], "usd_volume": t['usd_vol'],
+                       "side": t['side'], "type": "raw_trade", "source": "binance"})
+    log_issue(symbol, "INFO", f"Binance raw trades: {len(events)}")
+    return events
+
+# ---------- Bitget trades ----------
+def parse_bitget_trades(data):
+    if not isinstance(data, dict):
+        return []
+    trades_data = data.get("data", [])
+    if isinstance(trades_data, dict):
+        trades_data = trades_data.get("list", [])
+    if isinstance(trades_data, dict):
+        trades_data = trades_data.get("data", [])
+    if not isinstance(trades_data, list):
+        return []
+    trades = []
+    for item in trades_data:
         try:
-            r = requests.get(url, params=params, timeout=10)
-            if r.status_code == 200:
-                data = r.json()
-                if data:
-                    rows = []
-                    for item in data:
-                        price = float(item.get("price", 0))
-                        qty = float(item.get("origQty", 0))
-                        side = item.get("side", "")
-                        if side == "BUY":
-                            rows.append({"ts": item.get("time", 0), "long": price * qty, "short": 0})
-                        elif side == "SELL":
-                            rows.append({"ts": item.get("time", 0), "long": 0, "short": price * qty})
-                    self._log(f"[BINANCE_FUTURES] {symbol} -> {len(rows)} events")
-                    return rows
-            else:
-                self._log(f"[BINANCE_FUTURES] HTTP {r.status_code}")
-        except Exception as e:
-            self._log(f"[BINANCE_FUTURES] error: {e}")
+            trades.append({
+                "ts": normalize_ts(int(item.get("ts", 0))),
+                "price": float(item.get("price", 0)),
+                "usd_vol": float(item.get("price", 0)) * float(item.get("size", 0)),
+                "side": "long" if item.get("side", "") == "buy" else "short"
+            })
+        except:
+            continue
+    return trades
+
+def fetch_bitget_trades(symbol):
+    source = "Bitget"
+    sym = normalize_symbol(symbol)
+    resp = fetch_with_retries(source, "https://api.bitget.com/api/v2/mix/market/trades",
+                              params={"symbol": sym, "limit": 1000})
+    if not resp:
         return []
-
-    def _fetch_bybit(self, symbol):
-        self._rate_limit()
-        url = "https://api.bybit.com/v5/market/liquidations"
-        params = {"category": "linear", "symbol": symbol.upper(), "limit": 100}
-        try:
-            r = requests.get(url, params=params, timeout=10)
-            if r.status_code == 200:
-                data = r.json()
-                if data.get("retCode") == 0:
-                    items = data.get("result", {}).get("list", [])
-                    rows = []
-                    for item in items:
-                        price = float(item.get("price", 0))
-                        size = float(item.get("size", 0))
-                        side = item.get("side", "")
-                        if side == "Buy":
-                            rows.append({"ts": int(item.get("updatedTime", 0)), "long": price * size, "short": 0})
-                        elif side == "Sell":
-                            rows.append({"ts": int(item.get("updatedTime", 0)), "long": 0, "short": price * size})
-                    self._log(f"[BYBIT] {symbol} -> {len(rows)} events")
-                    return rows
-            else:
-                self._log(f"[BYBIT] HTTP {r.status_code}")
-        except Exception as e:
-            self._log(f"[BYBIT] error: {e}")     # fixed parentheses
+    try:
+        data = resp.json()
+    except:
         return []
+    trades = parse_bitget_trades(data)
+    events = []
+    for t in trades:
+        if not is_within_cutoff(t['ts']):
+            continue
+        events.append({"ts": t['ts'], "price": t['price'], "usd_volume": t['usd_vol'],
+                       "side": t['side'], "type": "raw_trade", "source": "bitget"})
+    log_issue(symbol, "INFO", f"Bitget raw trades: {len(events)}")
+    return events
 
-    def _fetch_deribit(self, symbol):
-        self._rate_limit()
-        coin = self._to_coin(symbol)
-        if coin not in ["BTC", "ETH"]:
-            return []
-        instrument = f"{coin}-PERPETUAL"
-        url = "https://www.deribit.com/api/v2/public/get_last_settlements_by_instrument"
-        params = {"instrument_name": instrument, "type": "liquidation", "count": 100}
-        try:
-            r = requests.get(url, params=params, timeout=10)
-            if r.status_code == 200:
-                data = r.json()
-                settlements = data.get("result", {}).get("settlements", [])
-                rows = []
-                for s in settlements:
-                    price = float(s.get("price", 0))
-                    qty = abs(float(s.get("position", 0)))
-                    direction = s.get("direction", "")
-                    if direction == "buy":
-                        rows.append({"ts": s.get("timestamp", 0), "long": price * qty, "short": 0})
-                    elif direction == "sell":
-                        rows.append({"ts": s.get("timestamp", 0), "long": 0, "short": price * qty})
-                self._log(f"[DERIBIT] {symbol} -> {len(rows)} events")
-                return rows
-            else:
-                self._log(f"[DERIBIT] HTTP {r.status_code}")
-        except Exception as e:
-            self._log(f"[DERIBIT] error: {e}")
-        return []
+# ---------- Deduplication ----------
+def deduplicate_events(events, symbol):
+    seen = set()
+    unique = []
+    price_round = 1 if "BTC" in symbol.upper() or "ETH" in symbol.upper() else 2
+    for e in events:
+        price_r = round(e['price'], price_round)
+        vol_bucket = int(e['usd_volume'] / 50) * 50
+        key = hashlib.md5(f"{e['source']}|{e['ts']}|{price_r}|{vol_bucket}|{e['side']}".encode()).hexdigest()
+        if key not in seen:
+            seen.add(key)
+            unique.append(e)
+    return unique
 
-    def _fetch_hyblock(self, symbol):
-        self._rate_limit()
-        coin = self._to_coin(symbol).lower()
-        url = f"https://api.hyblockcapital.com/liquidation/levels?symbol={coin}"
-        try:
-            r = requests.get(url, timeout=10)
-            if r.status_code == 200:
-                self._log(f"[HYBLOCK] {symbol} aggregated data available (skipping events)")
-                return []
-            else:
-                self._log(f"[HYBLOCK] HTTP {r.status_code}")
-        except Exception as e:
-            self._log(f"[HYBLOCK] error: {e}")
-        return []
-
-    # ---------- Master fetch with 2‑minute TTL ----------
-    def _get_liquidations(self, symbol, interval):
-        cache_key = (symbol.lower(), interval)
-        now = time.time()
-        if cache_key in self._liq_cache:
-            cached_time, cached_rows = self._liq_cache[cache_key]
-            if now - cached_time < self._ttl:
-                self._log(f"[CACHE_HIT] {symbol} {interval} (age={now-cached_time:.0f}s)")
-                return cached_rows
-        # Not in cache or expired
-        rows = self._fetch_coinalyze(symbol, interval)
-        if rows:
-            self._liq_cache[cache_key] = (now, rows)
-            return rows
-        rows = self._fetch_cryptocompare(symbol, interval)
-        if rows:
-            self._liq_cache[cache_key] = (now, rows)
-            return rows
-
-        events = self._fetch_binance_futures(symbol)
-        if not events:
-            events = self._fetch_bybit(symbol)
-        if not events:
-            events = self._fetch_deribit(symbol)
-        if events:
-            interval_ms = {"1m": 60000, "15m": 900000, "1h": 3600000}[interval]
-            bins = defaultdict(lambda: {"long": 0.0, "short": 0.0})
-            for e in events:
-                bucket = (e["ts"] // interval_ms) * interval_ms
-                bins[bucket]["long"] += e["long"]
-                bins[bucket]["short"] += e["short"]
-            rows = [{"ts": b, "long": v["long"], "short": v["short"]} for b, v in sorted(bins.items())]
-            if rows:
-                rows = rows[-120:]
-                self._liq_cache[cache_key] = (now, rows)
-                self._log(f"[BINNED] {symbol} {interval} -> {len(rows)} rows from raw events")
-                return rows
-        self._log(f"[WARNING] No data for {symbol} {interval}")
-        empty_row = [{"ts": int(now*1000), "long": 0.0, "short": 0.0}]
-        self._liq_cache[cache_key] = (now, empty_row)
-        return empty_row
-
-    # ---------- Price candles with TTL=2m for 1m, 24h for daily ----------
-    def _fetch_candles(self, symbol, interval="1m", limit=120):
-        if interval == "1d":
-            now = time.time()
-            if self._daily_candles_cache is not None and (now - self._daily_candles_time) < 86400:
-                return self._daily_candles_cache
-        elif interval == "1m":
-            now = time.time()
-            if symbol in self._1m_candles_cache:
-                cached_time, cached_candles = self._1m_candles_cache[symbol]
-                if now - cached_time < self._ttl:  # 2 minutes freshness for 1m candles
-                    return cached_candles
-
-        self._rate_limit()          # fixed: now calls the method, not a float
-        url = "https://api.binance.com/api/v3/klines"
-        params = {"symbol": symbol.upper(), "interval": interval, "limit": limit}
-        try:
-            r = requests.get(url, params=params, timeout=10)
-            if r.status_code == 200:
-                data = r.json()
-                candles = []
-                for c in data:
-                    candles.append({
-                        'ts': c[0],
-                        'high': float(c[2]),
-                        'low': float(c[3]),
-                        'volume': float(c[5])
-                    })
-                if interval == "1d":
-                    self._daily_candles_cache = candles
-                    self._daily_candles_time = time.time()
-                elif interval == "1m":
-                    self._1m_candles_cache[symbol] = (time.time(), candles)
-                return candles
-        except Exception as e:
-            self._log(f"[CANDLES] error: {e}")
-        return []
-
-    # ---------- Derived data (unchanged) ----------
-    def _heatmap(self, candles, bins=20):
-        if not candles:
-            return {}
-        min_p = min(c['low'] for c in candles)
-        max_p = max(c['high'] for c in candles)
-        if min_p >= max_p:
-            return {}
-        step = (max_p - min_p) / bins
-        hm = defaultdict(float)
-        for c in candles:
-            low, high, vol = c['low'], c['high'], c['volume']
-            start = int((low - min_p) / step)
-            end = int((high - min_p) / step)
-            span = max(1, end - start + 1)
-            per_bin = vol / span
-            for b in range(start, end+1):
-                if 0 <= b < bins:
-                    center = min_p + (b + 0.5) * step
-                    hm[center] += per_bin
-        return dict(hm)
-
-    def _cluster(self, values, tol=0.001):
-        clusters = []
-        for v in sorted(values):
-            found = False
-            for cl in clusters:
-                if abs(v - cl[0]) / cl[0] <= tol:
-                    cl.append(v)
-                    found = True
-                    break
-            if not found:
-                clusters.append([v])
-        return [(round(sum(c)/len(c), 4), len(c)) for c in clusters if len(c) >= 2]
-
-    def _pools(self, candles):
-        highs = [c['high'] for c in candles]
-        lows = [c['low'] for c in candles]
-        return self._cluster(highs), self._cluster(lows)
-
-    def _stop_levels(self, candles_daily):
-        if not candles_daily or len(candles_daily) < 7:
-            return {}
-        weekly_high = max(c['high'] for c in candles_daily[-7:])
-        weekly_low = min(c['low'] for c in candles_daily[-7:])
-        prev_day = candles_daily[-2] if len(candles_daily) >= 2 else candles_daily[-1]
-        return {
-            'prev_day_high': prev_day['high'],
-            'prev_day_low': prev_day['low'],
-            'prev_week_high': weekly_high,
-            'prev_week_low': weekly_low
-        }
-
-    # ---------- Public method ----------
-    def collect_and_save(self, symbol):
-        self._log(f"[COLLECT] Starting for {symbol} (TOON format)")
-        start_time = time.time()
-
-        # Clean old files
-        for ext in ['.tsv', '.toon']:
-            old_file = os.path.join(SYMBOLS_DIR, f"{symbol.lower()}_liquidations{ext}")
-            if os.path.exists(old_file):
-                try:
-                    os.remove(old_file)
-                    self._log(f"[CLEANUP] Removed old {ext} file")
-                except:
-                    pass
-
-        candles = self._fetch_candles(symbol, "1m", 120)
-        candles_daily = self._fetch_candles(symbol, "1d", 7)
-        now_ts = int(time.time() * 1000)
-
-        lines = []
-        lines.append(f"# Liquidation data for {symbol.upper()} – TOON format")
-        lines.append(f"generated: {datetime.now().isoformat()}")
-        lines.append(f"symbol: {symbol}")
-        lines.append("")
-
-        # 1. AGGREGATES (1m, 15m, 1h)
-        for iv in ["1m", "15m", "1h"]:
-            rows = self._get_liquidations(symbol, iv)
-            rows = rows[-10:] if len(rows) > 10 else rows
-            fields = ["timestamp", "long_volume", "short_volume", "total_volume"]
-            lines.append(f"liquidation_{iv}[{len(rows)}]{{{','.join(fields)}}}:")
-            if rows:
-                row_strings = [f"{r['ts']},{r['long']:.2f},{r['short']:.2f},{r['long']+r['short']:.2f}" for r in rows]
-                lines.append("  " + " |\n  ".join(row_strings))
-            else:
-                lines.append("  ")
-            lines.append("")
-
-        # 2. HEATMAP
-        hm = self._heatmap(candles, 20) if candles else {}
-        hm_items = sorted(hm.items()) if hm else []
-        lines.append(f"liquidity_heatmap[{len(hm_items)}]{{price_bin,volume}}:")
-        if hm_items:
-            row_strings = [f"{p:.2f},{v:.2f}" for p, v in hm_items]
-            lines.append("  " + " |\n  ".join(row_strings))
+# ---------- Main ----------
+def collect_raw_data(symbol):
+    log_issue(symbol, "INFO", "=== RAW DATA COLLECTOR (Fast Fail) ===")
+    all_events = []
+    all_events.extend(fetch_hyperliquid_true(symbol))
+    all_events.extend(fetch_dydx_true(symbol))
+    all_events.extend(fetch_bybit_true(symbol))
+    all_events.extend(fetch_binance_trades(symbol))
+    all_events.extend(fetch_bitget_trades(symbol))
+    all_events = deduplicate_events(all_events, symbol)
+    output_path = os.path.join(SYMBOLS_DIR, f"{symbol.lower()}_liquidations.tmp_x")
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write("ts\tprice\tusd_volume\tside\ttype\tsource\n")
+        if not all_events:
+            f.write("# No data downloaded from any source\n")
         else:
-            lines.append("  ")
-        lines.append("")
+            for e in all_events:
+                f.write(f"{e['ts']}\t{e['price']:.2f}\t{e['usd_volume']:.2f}\t{e['side']}\t{e['type']}\t{e['source']}\n")
+    log_issue(symbol, "INFO", f"Saved {len(all_events)} events to {output_path}")
+    return True
 
-        # 3. POOLS
-        high_p, low_p = self._pools(candles) if candles else ([], [])
-        lines.append(f"liquidity_pools_high[{len(high_p)}]{{level,count}}:")
-        lines.append("  " + (" |\n  ".join([f"{l},{c}" for l,c in high_p]) if high_p else " "))
-        lines.append("")
-        lines.append(f"liquidity_pools_low[{len(low_p)}]{{level,count}}:")
-        lines.append("  " + (" |\n  ".join([f"{l},{c}" for l,c in low_p]) if low_p else " "))
-        lines.append("")
-
-        # 4. STOP HUNT LEVELS
-        lvls = self._stop_levels(candles_daily) if candles_daily else {}
-        lines.append(f"stop_hunt_levels[{len(lvls)}]{{level_name,price}}:")
-        if lvls:
-            lines.append("  " + " |\n  ".join([f"{k},{v:.4f}" for k,v in lvls.items()]))
-        else:
-            lines.append("  ")
-        lines.append("")
-
-        lines.append("# ========== END OF TOON DATA ==========")
-
-        filepath = os.path.join(SYMBOLS_DIR, f"{symbol.lower()}_liquidations.toon")
-        content = "\n".join(lines) + "\n"
-        if self._atomic_write(filepath, content):
-            elapsed = time.time() - start_time
-            self._log(f"[SAVE_SUCCESS] {symbol} saved to TOON in {elapsed:.2f}s -> {filepath}")
-            return True
-        else:
-            self._log(f"[SAVE_FAIL] {symbol} could not save file")
-            return False
+def run_download(symbol):
+    return collect_raw_data(symbol)
 
 if __name__ == "__main__":
-    liq = LiquidationDataREST()
-    liq.collect_and_save("BTCUSDT")
+    if len(sys.argv) < 2:
+        print("Usage: python X13_liquidation_rest.py SYMBOL")
+        sys.exit(1)
+    success = run_download(sys.argv[1].upper())
+    sys.exit(0 if success else 1)
