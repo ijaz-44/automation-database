@@ -1,57 +1,55 @@
-# Groups/group_x/X15_session_rest.py (Enhanced with Session Range, Liquidity Levels, News Risk)
+#!/usr/bin/env python3
 """
-X15 - Session Analysis Module (TOON format, Multi‑Source, Lahore Timezone)
-- Session Kill Zones (London, NY) in Lahore time
-- Initial Balance (first 60 minutes) High/Low for each session
-- Previous Session High/Low (liquidity targets)
-- Economic Calendar (next 24h high‑impact news) with danger zone flag (next 15 min)
-- Session Volatility Profile (hourly avg, 30 days) – Binance (fallback)
-- Session Bias (based on price relative to last 8 candles)
-- Atomic rename + full logging
-- Saves to {symbol}_sessions.toon
+X15_session_rest.py – Raw Session Data Downloader (Only .tmp_x)
+- Fetches session kill zones (London, NY) in Lahore time
+- Fetches economic calendar (next 24h high‑impact events)
+- Fetches hourly volatility profile (30 days of 1h candles, averages per hour)
+- Fetches current price and last 48h 1h candles (for bias and levels)
+- Writes raw TSV: {symbol}_sessions.tmp_x
+- Logs to global file: market_data/binance/symbols/X15_sessions.log
+- No processing, no TOON, no derived calculations.
 """
 
-import requests
-import time
 import os
+import sys
+import time
 import datetime
-import re
+import requests
 from collections import defaultdict
 
+# ========== CONFIGURATION ==========
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SYMBOLS_DIR = os.path.join(BASE_DIR, "market_data", "binance", "symbols")
 os.makedirs(SYMBOLS_DIR, exist_ok=True)
 
-LOG_FILE = os.path.join(SYMBOLS_DIR, "session_issues.log")
-
-def _log(msg, level="INFO"):
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    line = f"{timestamp} [{level}] {msg}"
-    print(line)
-    try:
-        with open(LOG_FILE, 'a', encoding='utf-8') as f:
-            f.write(line + "\n")
-    except:
-        pass
-
-def atomic_write(path, content):
-    tmp = path + ".tmp"
-    try:
-        with open(tmp, 'w', encoding='utf-8') as f:
-            f.write(content)
-            f.flush()
-            os.fsync(f.fileno())
-        os.rename(tmp, path)
-        _log(f"[ATOMIC] OK -> {os.path.basename(path)}")
-        return True
-    except Exception as e:
-        if os.path.exists(tmp):
-            os.remove(tmp)
-        _log(f"[ATOMIC] FAIL {path}: {e}", "ERROR")
-        return False
+# Global log file for this module (not per symbol)
+LOG_FILE = os.path.join(SYMBOLS_DIR, "X15_sessions.log")
+LOG_MAX_SIZE = 5_000_000
 
 BINANCE_PRICE_URL = "https://api.binance.com/api/v3/klines"
 LAHORE_OFFSET = 5
+
+# ========== GLOBAL LOGGING ==========
+def rotate_log_if_needed():
+    if os.path.exists(LOG_FILE) and os.path.getsize(LOG_FILE) > LOG_MAX_SIZE:
+        backup = LOG_FILE + ".old"
+        try:
+            os.replace(LOG_FILE, backup)
+        except:
+            pass
+
+def log_issue(level, msg, **kwargs):
+    ts = time.strftime("%Y-%m-%d %H:%M:%S")
+    line = f"{ts} [{level}] {msg}"
+    if kwargs:
+        line += " " + str(kwargs)
+    print(line)
+    rotate_log_if_needed()
+    try:
+        with open(LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(line + "\n")
+    except:
+        pass
 
 def utc_to_lahore(utc_dt):
     return utc_dt + datetime.timedelta(hours=LAHORE_OFFSET)
@@ -59,7 +57,7 @@ def utc_to_lahore(utc_dt):
 def lahore_now():
     return utc_to_lahore(datetime.datetime.utcnow())
 
-# ---------------------- 1. Session Kill Zones (unchanged) ----------------------
+# ---------- 1. Session Kill Zones (raw) ----------
 def get_kill_zones():
     now_lahore = lahore_now()
     today = now_lahore.date()
@@ -93,7 +91,7 @@ def get_kill_zones():
         "newyork": {"start": ny_start.isoformat(), "end": ny_end.isoformat()}
     }
 
-# ---------------------- 2. Economic Calendar (with danger zone) ----------------------
+# ---------- 2. Economic Calendar (raw events) ----------
 def _parse_timestamp(ts):
     if ts is None:
         return None
@@ -114,9 +112,8 @@ def _parse_timestamp(ts):
 
 def fetch_economic_calendar():
     events = []
-    # Source 1: ForexFactory
+    # Primary: ForexFactory
     try:
-        _log("[X15] Fetching economic calendar from ForexFactory...")
         r = requests.get("https://nfs.faireconomy.media/ff_calendar_thisweek.json", timeout=8)
         if r.status_code == 200:
             data = r.json()
@@ -136,18 +133,13 @@ def fetch_economic_calendar():
                         "impact": "High"
                     })
             if events:
-                _log(f"[X15] ForexFactory OK, found {len(events)} high-impact events")
+                log_issue("INFO", f"ForexFactory: found {len(events)} high-impact events")
                 return events
-            else:
-                _log("[X15] ForexFactory no high-impact events in next 24h")
-        else:
-            _log(f"[X15] ForexFactory HTTP {r.status_code}")
     except Exception as e:
-        _log(f"[X15] ForexFactory error: {e}")
+        log_issue("WARNING", f"ForexFactory error: {e}")
 
-    # Source 2: economic-calendar-api
+    # Fallback: economic-calendar-api
     try:
-        _log("[X15] Trying fallback economic calendar source...")
         r = requests.get("https://economic-calendar-api.herokuapp.com/events", timeout=8)
         if r.status_code == 200:
             data = r.json()
@@ -168,101 +160,52 @@ def fetch_economic_calendar():
                         "impact": "High"
                     })
             if events:
-                _log(f"[X15] Fallback source OK, found {len(events)} events")
+                log_issue("INFO", f"Fallback calendar: found {len(events)} events")
                 return events
-            else:
-                _log("[X15] Fallback source no high-impact events")
-        else:
-            _log(f"[X15] Fallback source HTTP {r.status_code}")
     except Exception as e:
-        _log(f"[X15] Fallback source error: {e}")
+        log_issue("WARNING", f"Fallback calendar error: {e}")
 
-    # Source 3: static fallback
-    _log("[X15] Using static fallback (typical high-impact events)")
+    # Static fallback (example)
+    log_issue("WARNING", "No live economic calendar data, using static example")
     now_lahore = lahore_now()
-    static_events = [
-        {"datetime_lahore": (now_lahore + datetime.timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%S"), "currency": "USD", "title": "FOMC Statement (static example)", "impact": "High"},
-        {"datetime_lahore": (now_lahore + datetime.timedelta(hours=6)).strftime("%Y-%m-%dT%H:%M:%S"), "currency": "EUR", "title": "ECB Press Conference (static example)", "impact": "High"},
+    return [
+        {"datetime_lahore": (now_lahore + datetime.timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%S"), "currency": "USD", "title": "FOMC Statement (example)", "impact": "High"},
+        {"datetime_lahore": (now_lahore + datetime.timedelta(hours=6)).strftime("%Y-%m-%dT%H:%M:%S"), "currency": "EUR", "title": "ECB Press Conference (example)", "impact": "High"}
     ]
-    return static_events
 
-# ---------------------- 3. Volatility Profile (unchanged) ----------------------
-def get_hourly_volatility(symbol):
-    limit = 24 * 30
+# ---------- 3. Volatility Profile (raw hourly averages from Binance) ----------
+def get_hourly_volatility_raw(symbol):
+    limit = 24 * 30  # 30 days of 1h candles
     params = {"symbol": symbol.upper(), "interval": "1h", "limit": limit}
     try:
-        _log(f"[X15] Fetching volatility from Binance for {symbol}...")
-        r = requests.get(BINANCE_PRICE_URL, params=params, timeout=10)
-        if r.status_code == 200:
-            data = r.json()
-            hour_vol = defaultdict(list)
-            for candle in data:
-                ts_ms = candle[0]
-                dt_utc = datetime.datetime.utcfromtimestamp(ts_ms / 1000)
-                dt_lahore = utc_to_lahore(dt_utc)
-                hour = dt_lahore.hour
-                high = float(candle[2])
-                low = float(candle[3])
-                open_price = float(candle[1])
-                if open_price > 0:
-                    vol_pct = (high - low) / open_price * 100
-                    hour_vol[hour].append(vol_pct)
-            result = {}
-            for hour, vols in hour_vol.items():
-                if vols:
-                    result[hour] = round(sum(vols) / len(vols), 4)
-            if result:
-                _log(f"[X15] Binance OK, computed volatility for {len(result)} hours")
-                return result
-            else:
-                _log("[X15] Binance insufficient data")
-        else:
-            _log(f"[X15] Binance HTTP {r.status_code}")
+        r = requests.get(BINANCE_PRICE_URL, params=params, timeout=15)
+        if r.status_code != 200:
+            log_issue("WARNING", f"Volatility fetch HTTP {r.status_code}")
+            return {}
+        data = r.json()
+        hour_vol = defaultdict(list)
+        for candle in data:
+            ts_ms = candle[0]
+            dt_utc = datetime.datetime.utcfromtimestamp(ts_ms / 1000)
+            dt_lahore = utc_to_lahore(dt_utc)
+            hour = dt_lahore.hour
+            high = float(candle[2])
+            low = float(candle[3])
+            open_price = float(candle[1])
+            if open_price > 0:
+                vol_pct = (high - low) / open_price * 100
+                hour_vol[hour].append(vol_pct)
+        result = {}
+        for hour, vols in hour_vol.items():
+            result[hour] = round(sum(vols) / len(vols), 4)
+        log_issue("INFO", f"Volatility profile: computed {len(result)} hours")
+        return result
     except Exception as e:
-        _log(f"[X15] Binance error: {e}")
-    static = {}
-    for h in range(24):
-        if 8 <= h <= 12:
-            static[h] = 0.45
-        elif 17 <= h <= 20:
-            static[h] = 0.55
-        else:
-            static[h] = 0.25
-    return static
+        log_issue("ERROR", f"Volatility fetch error: {e}")
+        return {}
 
-# ---------------------- 4. Helper: Read 1h candles from local .toon (or fallback to API) ----------------------
-def read_1h_candles(symbol, limit=48):
-    """Return list of dicts each with 'high', 'low', 'close' (last 'limit' candles)."""
-    filepath = os.path.join(SYMBOLS_DIR, f"{symbol.lower()}.toon")
-    if not os.path.exists(filepath):
-        return fetch_1h_candles_api(symbol, limit)
-    try:
-        with open(filepath, 'r', encoding='utf-8') as f:
-            content = f.read()
-        pattern = r'candles_1h\[\d+\]\{ts,dt,o,h,l,c,v\}:\s*\n(?:\s+([^\n]+(?:\n\s+[^\n]+)*))?'
-        match = re.search(pattern, content, re.DOTALL)
-        if not match:
-            return fetch_1h_candles_api(symbol, limit)
-        rows_text = match.group(1)
-        if not rows_text:
-            return []
-        candles = []
-        for row in rows_text.split(' | '):
-            parts = row.strip().split(',')
-            if len(parts) >= 7:
-                candles.append({
-                    'high': float(parts[3]),
-                    'low': float(parts[4]),
-                    'close': float(parts[5])
-                })
-        if len(candles) > limit:
-            candles = candles[-limit:]
-        return candles
-    except Exception as e:
-        _log(f"[X15] Error reading 1h candles: {e}", "WARNING")
-        return fetch_1h_candles_api(symbol, limit)
-
-def fetch_1h_candles_api(symbol, limit=48):
+# ---------- 4. Candles for bias (last 48h 1h candles) ----------
+def fetch_1h_candles(symbol, limit=48):
     params = {"symbol": symbol.upper(), "interval": "1h", "limit": limit}
     try:
         r = requests.get(BINANCE_PRICE_URL, params=params, timeout=10)
@@ -271,178 +214,78 @@ def fetch_1h_candles_api(symbol, limit=48):
             candles = []
             for c in data:
                 candles.append({
+                    'timestamp': int(c[0]),
                     'high': float(c[2]),
                     'low': float(c[3]),
                     'close': float(c[4])
                 })
             return candles
         else:
-            _log(f"[X15] API fetch failed: HTTP {r.status_code}", "WARNING")
+            log_issue("WARNING", f"Candles fetch HTTP {r.status_code}")
+            return []
     except Exception as e:
-        _log(f"[X15] API fetch error: {e}", "WARNING")
-    return []
+        log_issue("ERROR", f"Candles fetch error: {e}")
+        return []
 
-# ---------------------- 5. Session Range (Initial Balance) ----------------------
-def get_initial_balance(symbol, session_start, session_end):
-    """
-    For a given session (start/end datetime in Lahore time), fetch 1‑minute candles
-    within that session and compute high/low of the first 60 minutes.
-    Returns (ib_high, ib_low) or (None, None) if insufficient data.
-    """
-    # Convert Lahore datetime to UTC timestamp (ms)
-    start_utc = session_start - datetime.timedelta(hours=LAHORE_OFFSET)
-    end_utc = session_end - datetime.timedelta(hours=LAHORE_OFFSET)
-    ib_end = start_utc + datetime.timedelta(hours=1)
-    if ib_end > end_utc:
-        ib_end = end_utc
-    start_ms = int(start_utc.timestamp() * 1000)
-    end_ms = int(ib_end.timestamp() * 1000)
-    url = "https://api.binance.com/api/v3/klines"
-    params = {"symbol": symbol.upper(), "interval": "1m", "startTime": start_ms, "endTime": end_ms, "limit": 60}
-    try:
-        r = requests.get(url, params=params, timeout=10)
-        if r.status_code != 200:
-            _log(f"[X15] IB fetch failed: HTTP {r.status_code}", "WARNING")
-            return None, None
-        data = r.json()
-        if not data:
-            return None, None
-        high = max(float(c[2]) for c in data)
-        low = min(float(c[3]) for c in data)
-        return high, low
-    except Exception as e:
-        _log(f"[X15] IB error: {e}", "WARNING")
-        return None, None
+# ---------- 5. Helper for current price (from latest 1h candle) ----------
+def get_current_price(candles):
+    if candles:
+        return candles[-1]['close']
+    return 0.0
 
-# ---------------------- 6. Session Bias & Previous Session High/Low ----------------------
-def get_session_bias_and_liquidity(symbol):
-    candles = read_1h_candles(symbol, limit=48)   # last 48 hours (2 days)
-    if not candles or len(candles) < 8:
-        return "Neutral", None, None
-    last_8_high = max(c['high'] for c in candles[-8:])
-    last_8_low = min(c['low'] for c in candles[-8:])
-    current_price = candles[-1]['close']
-    if current_price > last_8_high:
-        bias = "Strong_Bullish"
-    elif current_price < last_8_low:
-        bias = "Strong_Bearish"
-    else:
-        bias = "Neutral"
-    # Previous session high/low (last 24 hours)
-    last_24_high = max(c['high'] for c in candles[-24:]) if len(candles) >= 24 else last_8_high
-    last_24_low = min(c['low'] for c in candles[-24:]) if len(candles) >= 24 else last_8_low
-    return bias, last_24_high, last_24_low
-
-# ---------------------- 7. Main Save Function (enhanced) ----------------------
-def collect_and_save(symbol):
-    _log(f"[COLLECT] Starting for {symbol} (TOON format, enhanced session)")
-    start_time = time.time()
-
-    kill_zones = get_kill_zones()
-    _log(f"[X15] Kill zones: London {kill_zones['london']['start']} -> {kill_zones['london']['end']}, NY {kill_zones['newyork']['start']} -> {kill_zones['newyork']['end']}")
-
-    economic_events = fetch_economic_calendar()
-    volatility_profile = get_hourly_volatility(symbol)
-
-    # Compute session bias and previous session high/low
-    bias, prev_high, prev_low = get_session_bias_and_liquidity(symbol)
-
-    # Compute Initial Balance for London and NY sessions (if within time bounds)
-    now_lahore = lahore_now()
-    london_start = datetime.datetime.fromisoformat(kill_zones['london']['start'])
-    london_end = datetime.datetime.fromisoformat(kill_zones['london']['end'])
-    ny_start = datetime.datetime.fromisoformat(kill_zones['newyork']['start'])
-    ny_end = datetime.datetime.fromisoformat(kill_zones['newyork']['end'])
-    london_ib_high = london_ib_low = None
-    ny_ib_high = ny_ib_low = None
-    if now_lahore < london_end and now_lahore > london_start - datetime.timedelta(hours=1):
-        london_ib_high, london_ib_low = get_initial_balance(symbol, london_start, london_end)
-    if now_lahore < ny_end and now_lahore > ny_start - datetime.timedelta(hours=1):
-        ny_ib_high, ny_ib_low = get_initial_balance(symbol, ny_start, ny_end)
-
-    # Determine news danger zone (if any high‑impact event within next 15 minutes)
-    danger_zone = False
-    now_utc = int(time.time())
-    for ev in economic_events:
-        dt_str = ev.get('datetime_lahore', '')
-        try:
-            dt = datetime.datetime.fromisoformat(dt_str.replace('Z', '+00:00'))
-            event_utc = int(dt.timestamp())
-            if 0 < event_utc - now_utc < 900:   # within 15 minutes
-                danger_zone = True
-                break
-        except:
-            continue
-
-    # Build TOON content
-    lines = []
-    lines.append(f"# Session analysis for {symbol.upper()} – TOON format (enhanced)")
-    lines.append(f"generated: {datetime.datetime.now().isoformat()}")
-    lines.append(f"symbol: {symbol}")
-    lines.append("")
+# ---------- 6. Main Downloader (raw output) ----------
+def run_download(symbol):
+    log_issue("INFO", f"Starting session raw download for {symbol}")
+    start = time.time()
 
     # 1. Kill zones
-    kill_fields = ["session", "start", "end"]
-    kill_rows = [
-        ["London", kill_zones['london']['start'], kill_zones['london']['end']],
-        ["NewYork", kill_zones['newyork']['start'], kill_zones['newyork']['end']]
-    ]
-    lines.append(f"session_kill_zones[{len(kill_rows)}]{{{','.join(kill_fields)}}}:")
-    lines.append("  " + " |\n  ".join([','.join(row) for row in kill_rows]))
-    lines.append("")
+    kill_zones = get_kill_zones()
 
-    # 2. Economic calendar
-    econ_fields = ["datetime_lahore", "currency", "title", "impact"]
-    econ_rows = []
-    for ev in economic_events:
-        econ_rows.append([ev['datetime_lahore'], ev['currency'], ev['title'], ev['impact']])
-    if not econ_rows:
-        econ_rows.append(["NO_HIGH_IMPACT_EVENTS", "0", "0", "0"])
-    lines.append(f"economic_calendar[{len(econ_rows)}]{{{','.join(econ_fields)}}}:")
-    lines.append("  " + " |\n  ".join([','.join(row) for row in econ_rows]))
-    lines.append("")
+    # 2. Economic calendar events
+    econ_events = fetch_economic_calendar()
 
-    # 3. Volatility profile
-    vol_fields = ["hour_lahore", "avg_volatility_pct"]
-    if volatility_profile:
-        sorted_hours = sorted(volatility_profile.keys())
-        vol_rows = [[str(h), str(volatility_profile[h])] for h in sorted_hours]
-    else:
-        vol_rows = [["NO_DATA", "0"]]
-    lines.append(f"volatility_profile[{len(vol_rows)}]{{{','.join(vol_fields)}}}:")
-    lines.append("  " + " |\n  ".join([','.join(row) for row in vol_rows]))
-    lines.append("")
+    # 3. Volatility profile (hourly averages)
+    vol_profile = get_hourly_volatility_raw(symbol)
 
-    # 4. Session bias and liquidity levels (simple key‑value lines for easy parsing)
-    lines.append("session_bias: " + bias)
-    lines.append(f"previous_session_high: {prev_high if prev_high else 'N/A'}")
-    lines.append(f"previous_session_low: {prev_low if prev_low else 'N/A'}")
-    lines.append(f"news_danger_zone: {'YES' if danger_zone else 'NO'}")
-    lines.append("")
+    # 4. 1h candles for bias and levels
+    candles = fetch_1h_candles(symbol, limit=48)
+    if not candles or len(candles) < 8:
+        log_issue("WARNING", f"Insufficient candles for {symbol} (need 8), will use empty values")
 
-    # 5. Initial Balance arrays (if available)
-    if london_ib_high and london_ib_low:
-        lines.append("london_initial_balance[1]{high,low}:")
-        lines.append(f"  {london_ib_high},{london_ib_low}")
-        lines.append("")
-    if ny_ib_high and ny_ib_low:
-        lines.append("newyork_initial_balance[1]{high,low}:")
-        lines.append(f"  {ny_ib_high},{ny_ib_low}")
-        lines.append("")
+    # Write to .tmp_x TSV (plural name: sessions)
+    tmp_x_path = os.path.join(SYMBOLS_DIR, f"{symbol.lower()}_sessions.tmp_x")
+    with open(tmp_x_path, "w", encoding="utf-8") as f:
+        # Header
+        f.write("data_type\tkey\tvalue1\tvalue2\tvalue3\tvalue4\tvalue5\n")
 
-    lines.append("# ========== END OF TOON DATA ==========")
+        # Kill zones
+        f.write("kill_zone\tlondon_start\t{}\t\t\t\t\n".format(kill_zones['london']['start']))
+        f.write("kill_zone\tlondon_end\t{}\t\t\t\t\n".format(kill_zones['london']['end']))
+        f.write("kill_zone\tny_start\t{}\t\t\t\t\n".format(kill_zones['newyork']['start']))
+        f.write("kill_zone\tny_end\t{}\t\t\t\t\n".format(kill_zones['newyork']['end']))
 
-    filepath = os.path.join(SYMBOLS_DIR, f"{symbol.lower()}_sessions.toon")
-    content = "\n".join(lines) + "\n"
-    if atomic_write(filepath, content):
-        elapsed = time.time() - start_time
-        _log(f"[SAVE_SUCCESS] {symbol} saved to TOON in {elapsed:.2f}s -> {filepath}")
-        return True
-    else:
-        _log(f"[SAVE_FAIL] {symbol} could not save file", "ERROR")
-        return False
+        # Economic events (each event as a row)
+        for ev in econ_events:
+            f.write("economic_event\t{}\t{}\t{}\t{}\t\t\n".format(
+                ev['datetime_lahore'], ev['currency'], ev['title'], ev['impact']))
 
-session_collect = collect_and_save
+        # Volatility profile (each hour as a row)
+        for hour, avg_vol in sorted(vol_profile.items()):
+            f.write("volatility_profile\t{}\t{}\t\t\t\t\n".format(hour, avg_vol))
+
+        # 1h candles (each candle as a row)
+        for c in candles:
+            f.write("candle_1h\t{}\t{}\t{}\t{}\t\t\n".format(
+                c['timestamp'], c['high'], c['low'], c['close']))
+
+    log_issue("INFO", f"Raw session data saved to {tmp_x_path}")
+    elapsed = time.time() - start
+    log_issue("INFO", f"Download complete for {symbol} in {elapsed:.2f}s")
+    return True
 
 if __name__ == "__main__":
-    collect_and_save("BTCUSDT")
+    if len(sys.argv) < 2:
+        print("Usage: python X15_session_rest.py SYMBOL")
+        sys.exit(1)
+    success = run_download(sys.argv[1].upper())
+    sys.exit(0 if success else 1)
