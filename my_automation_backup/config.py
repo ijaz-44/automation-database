@@ -1,7 +1,8 @@
-# config.py – with inline prediction expansion (single 1h forecast, small text)
+# config.py – with GO button linking to full analysis page (no brain.py)
+# NOTE: TOON, DB, JSON formats are removed. X‑buttons light up when .tmp_p file exists.
 
 MARKET_TIMEFRAMES = {
-    "Binary OTC": "5m",
+    "Binary OTC": "1h",
     "CFD":        "5m",
     "Spot":       "5m",
     "Future":     "5m",
@@ -506,44 +507,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   ::-webkit-scrollbar { width: 5px; }
   ::-webkit-scrollbar-track { background: #0d0d0d; }
   ::-webkit-scrollbar-thumb { background: #9AFFAB; border-radius: 0; }
-
-  /* Expand row prediction (1h only, small text) */
-  .expand-row {
-    background: #1a1a2e;
-    border-top: 1px solid #333;
-    padding: 8px 12px;
-    margin-top: 4px;
-    font-size: 9px;
-    color: #ccc;
-  }
-  .prediction-details {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-  .prediction-line {
-    display: flex;
-    gap: 8px;
-    align-items: baseline;
-    flex-wrap: wrap;
-  }
-  .prediction-badge {
-    font-weight: bold;
-    font-size: 11px;
-  }
-  .prediction-path {
-    font-size: 9px;
-    color: #aaa;
-  }
-  .ok-btn {
-    background: #1a1a1a;
-    border: 1px solid #333;
-    padding: 2px 8px;
-    font-size: 9px;
-    cursor: pointer;
-    color: #ccc;
-    margin-top: 5px;
-  }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 </head>
@@ -715,58 +678,7 @@ function escapeHtml(str) {
   });
 }
 
-// ================== NEW: Inline prediction (single 1h forecast, small text) ==================
-function doPredict(market, pair, tf, event) {
-  let btn = event.target;
-  let row = btn.closest('.pair-card');
-  if (!row) return;
-  // Remove existing expand row if any
-  let existing = row.nextElementSibling;
-  if (existing && existing.classList && existing.classList.contains('expand-row')) {
-    existing.remove();
-    return;
-  }
-  let expandRow = document.createElement('div');
-  expandRow.className = 'expand-row';
-  expandRow.innerHTML = '<div class="prediction-loader"><span class="spinner"></span> Loading 1h forecast...</div>';
-  row.insertAdjacentElement('afterend', expandRow);
-  
-  fetch(`/predict/${encodeURIComponent(pair)}`)
-    .then(response => response.json())
-    .then(data => {
-      if (data.error) {
-        expandRow.innerHTML = `<div style="color:#FF6352; font-size:9px;">Error: ${data.error}</div>
-                               <button class="ok-btn" onclick="this.parentElement.remove()">Close</button>`;
-        return;
-      }
-      // data contains: direction, confidence, target_low, target_high, path
-      const direction = data.direction || "WAIT";
-      const confidence = data.confidence || 0;
-      const directionColor = direction === "UP" ? "#00ff88" : (direction === "DOWN" ? "#ff4444" : "#ffcc44");
-      const targetLow = data.target_low ? data.target_low.toFixed(2) : "?";
-      const targetHigh = data.target_high ? data.target_high.toFixed(2) : "?";
-      const path = data.path || "";
-      let html = `
-        <div class="prediction-details" style="font-size:9px;">
-          <div class="prediction-line">
-            <span><b>1h forecast:</b></span>
-            <span class="prediction-badge" style="color:${directionColor};">${direction}</span>
-            <span>(${confidence}%)</span>
-            <span>Target: ${targetLow} - ${targetHigh}</span>
-          </div>
-          <div class="prediction-path">${escapeHtml(path)}</div>
-          <button class="ok-btn" onclick="this.closest('.expand-row').remove()">Close</button>
-        </div>
-      `;
-      expandRow.innerHTML = html;
-    })
-    .catch(err => {
-      expandRow.innerHTML = `<div style="color:#FF6352; font-size:9px;">Error: ${err.message}</div>
-                             <button class="ok-btn" onclick="this.parentElement.remove()">Close</button>`;
-    });
-}
-
-// ================== Update percentages (unchanged) ==================
+// ================== Update percentages (uses .tmp_p completion status from backend) ==================
 async function updatePercentages(symbol, card) {
   try {
     const statusResp = await fetch(`/fill_status?symbol=${encodeURIComponent(symbol)}`);
@@ -777,11 +689,8 @@ async function updatePercentages(symbol, card) {
       const btn = card.querySelector(`.data-btn.${comp}`);
       if (btn) {
         let percent = 0;
-        if (comp === 'liquidations') {
-          if (status['derivative'] === true) percent = 100;
-        } else {
-          if (status[comp] === true) percent = 100;
-        }
+        // FIX: liquidations button now uses status['liquidations'] directly
+        if (status[comp] === true) percent = 100;
         let label = comp.toUpperCase();
         if (comp === 'liquidations') label = 'LIQ';
         if (comp === 'volProfile') label = 'VOLP';
@@ -835,7 +744,7 @@ function buildCards(originalTbody) {
       ${callPlaceholder}
       <span class='pair-name'>${escapeHtml(pairName)}</span>
       <span class='score-badge'>${scoreHtml}</span>
-      <button class='go-btn' onclick="doPredict('${_mkt}','${escapeHtml(pairName)}','${_tf}', event)">→</button>
+      <button class='go-btn' onclick="window.open('/go_analysis/' + encodeURIComponent('${escapeHtml(pairName)}'), '_blank')">→</button>
     `;
     
     // Z‑group (8 buttons) – initial values set to "No data"
@@ -1109,14 +1018,8 @@ function fillSymbol(pair) {
                 var comp = allComponents[i];
                 var btn = card.querySelector('.data-btn.' + comp);
                 if (btn) {
-                  if (comp === 'liquidations') {
-                    if (status['derivative'] === true) {
-                      btn.classList.add('available');
-                      btn.style.opacity = '1';
-                    } else {
-                      allDone = false;
-                    }
-                  } else if (comp === 'master') {
+                  // FIX: liquidations now uses status['liquidations'] directly
+                  if (comp === 'master') {
                     btn.style.opacity = '1';
                   } else {
                     if (status[comp] === true) {
