@@ -1,9 +1,10 @@
 """
-Binance WebSocket – TOON storage (only 1m candles, no resampling)
-- Stores 'candles_1m' array in .toon file (last 120 candles per symbol)
-- Periodic flush to disk (every 10 min) to reduce I/O
+Binance WebSocket – TSV storage (only 1m candles, no resampling)
+- Stores 'candles_1m' in {symbol}.tsv (last 120 candles per symbol)
+- Periodic flush to disk (every 10 min)
 - Multi‑symbol support
-- SSL verification disabled by default (fix for Android QPython)
+- SSL verification disabled by default (for Android QPython)
+- Logs summary every minute (not per candle)
 """
 
 import websocket
@@ -12,7 +13,6 @@ import json
 import time
 import ssl
 import os
-import re
 from collections import deque
 from datetime import datetime
 
@@ -27,9 +27,9 @@ class BinanceWebSocket:
         os.makedirs(self.symbols_dir, exist_ok=True)
 
         self._lock = threading.Lock()
-        self._candles = {}
-        self._live_candles = {}
-        self._last_update = {}
+        self._candles = {}          # symbol -> deque of candles (maxlen=120)
+        self._live_candles = {}     # symbol -> current live (unclosed) candle
+        self._last_update = {}      # symbol -> last update timestamp
         self._flush_interval = flush_interval_minutes * 60
         self._last_flush = time.time()
         self._verify_ssl = verify_ssl
@@ -41,111 +41,86 @@ class BinanceWebSocket:
         self._callback = None
         self._running = False
         self._reconnect_delay = 5
-        self.tick_count = 0
-        self._last_log = time.time()
+        self._update_counter = 0           # total updates since last log
+        self._last_log_time = time.time()
+        self._active_symbols = set()       # symbols that received updates in last minute
 
-        self._load_all_from_toon()
-        print(f"✅ [BinanceWS] TOON mode – flush every {flush_interval_minutes} min (no resampling)")
+        self._load_all_from_tsv()
+        print(f"✅ [BinanceWS] TSV mode – flush every {flush_interval_minutes} min (no resampling)")
         if not verify_ssl:
             print("⚠️ [BinanceWS] SSL verification disabled (for Android compatibility)")
 
-    # ---------- Disk I/O (TOON) ----------
+    # ---------- Disk I/O (TSV) ----------
     def _get_symbol_file(self, symbol):
-        return os.path.join(self.symbols_dir, f"{symbol}.toon")
+        return os.path.join(self.symbols_dir, f"{symbol}.tsv")
 
     def _ensure_file_exists(self, symbol):
         filepath = self._get_symbol_file(symbol)
-        if os.path.exists(filepath):
-            return
-        with open(filepath, 'w', encoding='utf-8') as f:
-            f.write(f"# Real‑time 1m candles for {symbol.upper()} – TOON format\n")
-            f.write(f"generated: {datetime.now().isoformat()}\n")
-            f.write(f"source: websocket\n\n")
-            f.write("candles_4h[0]{ts,dt,o,h,l,c,v}:\n\n")
-            f.write("candles_1h[0]{ts,dt,o,h,l,c,v}:\n\n")
-            f.write("candles_15m[0]{ts,dt,o,h,l,c,v}:\n\n")
-            f.write("candles_1m[0]{ts,dt,o,h,l,c,v}:\n\n")
-            f.write("# ========== END OF TOON DATA ==========\n")
+        if not os.path.exists(filepath):
+            with open(filepath, 'w', encoding='utf-8') as f:
+                f.write("timestamp\topen\thigh\tlow\tclose\tvolume\n")
 
-    # FIXED: use group(1) and handle empty rows
-    def _read_candles_1m_from_toon(self, symbol):
+    def _read_candles_from_tsv(self, symbol):
+        """Read last 120 candles from TSV (returns list of dicts)."""
         filepath = self._get_symbol_file(symbol)
         if not os.path.exists(filepath):
             return []
-        with open(filepath, 'r', encoding='utf-8') as f:
-            content = f.read()
-        pattern = r'candles_1m\[\d+\]\{ts,dt,o,h,l,c,v\}:\s*\n(?:\s+([^\n]+(?:\n\s+[^\n]+)*))?'
-        match = re.search(pattern, content, re.DOTALL)
-        if not match:
-            return []
-        rows_text = match.group(1)   # <-- fixed: group(1) not group(2)
-        if not rows_text:
-            return []
         candles = []
-        for row in rows_text.split(' | '):
-            row = row.strip()
-            if not row:
+        with open(filepath, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+        if len(lines) < 2:
+            return []
+        # Skip header
+        for line in lines[1:]:
+            line = line.strip()
+            if not line:
                 continue
-            parts = row.split(',')
-            if len(parts) >= 7:
+            parts = line.split('\t')
+            if len(parts) >= 6:
                 try:
                     candles.append({
                         "ts": int(parts[0]),
-                        "dt": parts[1],
-                        "o": float(parts[2]),
-                        "h": float(parts[3]),
-                        "l": float(parts[4]),
-                        "c": float(parts[5]),
-                        "v": float(parts[6]),
+                        "o": float(parts[1]),
+                        "h": float(parts[2]),
+                        "l": float(parts[3]),
+                        "c": float(parts[4]),
+                        "v": float(parts[5]),
                         "closed": True
                     })
                 except:
                     continue
-        return candles
+        # Keep only last 120
+        return candles[-120:]
 
-    def _load_all_from_toon(self):
+    def _load_all_from_tsv(self):
         if not os.path.exists(self.symbols_dir):
             return
         loaded = 0
         for filename in os.listdir(self.symbols_dir):
-            if filename.endswith('.toon'):
-                sym = filename[:-5]
-                candles = self._read_candles_1m_from_toon(sym)
+            if filename.endswith('.tsv'):
+                sym = filename[:-4]
+                candles = self._read_candles_from_tsv(sym)
                 if candles:
                     self._candles[sym] = deque(candles, maxlen=120)
                     loaded += len(candles)
         print(f"✅ [BinanceWS] Loaded {loaded} 1m candles from {len(self._candles)} symbols")
 
     def _flush_symbol_to_disk(self, symbol):
+        """Rewrite entire TSV file with current deque."""
         filepath = self._get_symbol_file(symbol)
-        if not os.path.exists(filepath):
-            self._ensure_file_exists(symbol)
-        try:
-            with open(filepath, 'r', encoding='utf-8') as f:
-                content = f.read()
-        except Exception as e:
-            print(f"❌ [WS] Flush read error {symbol}: {e}")
+        self._ensure_file_exists(symbol)
+        with self._lock:
+            dq = self._candles.get(symbol, deque())
+        if not dq:
             return
-
-        pattern = r'(candles_1m\[\d+\]\{ts,dt,o,h,l,c,v\}:\s*\n)((?:\s+[^\n]+\n)*)(?=\s*\n?\s*candles_15m|\Z)'
-        match = re.search(pattern, content, re.DOTALL)
-        if not match:
-            print(f"❌ [WS] No candles_1m block for {symbol}")
-            return
-
-        prefix = match.group(1)
-        rows = []
-        for c in self._candles.get(symbol, []):
-            row = f"{c['ts']},{c['dt']},{c['o']},{c['h']},{c['l']},{c['c']},{c['v']}"
-            rows.append(row)
-        new_rows_block = "  " + " |\n  ".join(rows) + "\n" if rows else ""
-        new_count = len(rows)
-        new_prefix = re.sub(r'\[\d+\]', f'[{new_count}]', prefix)
-        new_content = content[:match.start(1)] + new_prefix + new_rows_block + content[match.end(2):]
-
+        # Build TSV content
+        lines = ["timestamp\topen\thigh\tlow\tclose\tvolume"]
+        for c in dq:
+            ts_sec = c['ts'] // 1000 if 'ts' in c else int(c.get('timestamp', 0))
+            lines.append(f"{ts_sec}\t{c['o']:.8f}\t{c['h']:.8f}\t{c['l']:.8f}\t{c['c']:.8f}\t{c['v']:.8f}")
         try:
             with open(filepath, 'w', encoding='utf-8') as f:
-                f.write(new_content)
+                f.write("\n".join(lines))
         except Exception as e:
             print(f"❌ [WS] Flush write error {symbol}: {e}")
 
@@ -214,26 +189,19 @@ class BinanceWebSocket:
             is_closed = bool(k['x'])
 
             ts_ms = k['t']
-            ts_sec = ts_ms // 1000
-            dt_str = time.strftime('%y%m%dT%H%M', time.localtime(ts_sec))
             candle = {
                 "ts": ts_ms,
-                "dt": dt_str,
-                "o": round(float(k['o']), 4),
-                "h": round(float(k['h']), 4),
-                "l": round(float(k['l']), 4),
-                "c": round(float(k['c']), 4),
-                "v": round(float(k['v']), 4),
-                "closed": is_closed,
-                "timestamp": ts_sec
+                "o": round(float(k['o']), 8),
+                "h": round(float(k['h']), 8),
+                "l": round(float(k['l']), 8),
+                "c": round(float(k['c']), 8),
+                "v": round(float(k['v']), 8),
+                "closed": is_closed
             }
 
             self._last_update[symbol] = int(time.time())
-            self.tick_count += 1
-            now = time.time()
-            if now - self._last_log > 30:
-                self._last_log = now
-                print(f"[BinanceWS] {self.tick_count} updates")
+            self._active_symbols.add(symbol)
+            self._update_counter += 1
 
             with self._lock:
                 if symbol not in self._candles:
@@ -241,12 +209,12 @@ class BinanceWebSocket:
                 dq = self._candles[symbol]
 
                 if is_closed:
+                    # Remove any existing candle with same timestamp (should not happen)
                     new_dq = [c for c in dq if c['ts'] != candle['ts']]
                     dq.clear()
                     dq.extend(new_dq)
                     dq.append(candle)
                     self._live_candles.pop(symbol, None)
-                    print(f"[BinanceWS] ✔ Closed {symbol} {dt_str} close={candle['c']}")
                 else:
                     self._live_candles[symbol] = candle
                     if dq and dq[-1]['ts'] == candle['ts']:
@@ -254,9 +222,19 @@ class BinanceWebSocket:
                     else:
                         dq.append(candle)
 
+            # Periodic flush
+            now = time.time()
             if now - self._last_flush >= self._flush_interval:
                 self._flush_all()
                 self._last_flush = now
+
+            # Minute‑wise summary logging
+            if now - self._last_log_time >= 60:
+                active_count = len(self._active_symbols)
+                print(f"[BinanceWS] {self._update_counter} updates in last minute ({active_count} symbols active)")
+                self._update_counter = 0
+                self._active_symbols.clear()
+                self._last_log_time = now
 
             if self._callback:
                 self._callback(symbol, candle['c'], now)
@@ -277,6 +255,7 @@ class BinanceWebSocket:
         with self._lock:
             dq = self._candles.get(sym, deque())
         candles = list(dq)
+        # Add timestamp (seconds) for compatibility
         for c in candles:
             if 'timestamp' not in c:
                 c['timestamp'] = c['ts'] // 1000
@@ -310,25 +289,29 @@ class BinanceWebSocket:
         return self.get_closed_count(symbol) >= minutes
 
     def replace_candles(self, symbol, candles):
+        """Merge REST candles into deque (used for backfill)."""
         sym = symbol.lower()
         new_candles = []
         for c in candles:
             ts_sec = c['timestamp']
             ts_ms = ts_sec * 1000
-            dt_str = time.strftime('%y%m%dT%H%M', time.localtime(ts_sec))
             new_candles.append({
                 "ts": ts_ms,
-                "dt": dt_str,
-                "o": round(c['open'], 4),
-                "h": round(c['high'], 4),
-                "l": round(c['low'], 4),
-                "c": round(c['close'], 4),
-                "v": round(c['volume'], 4),
-                "closed": True,
-                "timestamp": ts_sec
+                "o": round(c['open'], 8),
+                "h": round(c['high'], 8),
+                "l": round(c['low'], 8),
+                "c": round(c['close'], 8),
+                "v": round(c['volume'], 8),
+                "closed": True
             })
         with self._lock:
-            self._candles[sym] = deque(new_candles[-120:], maxlen=120)
+            # Merge: keep existing candles with timestamps > last new candle timestamp
+            existing = self._candles.get(sym, deque())
+            existing_list = list(existing)
+            # Filter out any with ts >= min new ts? Simpler: replace the deque
+            all_candles = new_candles + [c for c in existing_list if c['ts'] > new_candles[-1]['ts']]
+            all_candles.sort(key=lambda x: x['ts'])
+            self._candles[sym] = deque(all_candles[-120:], maxlen=120)
             self._live_candles.pop(sym, None)
         self._flush_symbol_to_disk(sym)
         print(f"[BinanceWS] Replaced {sym} candles via REST merge")
@@ -347,4 +330,4 @@ class BinanceWebSocket:
     def name(self):
         return "BinanceWS"
 
-print("✅ [binance_ws] TOON version loaded (SSL verification disabled for Android)")
+print("✅ [binance_ws] TSV version loaded (SSL verification disabled for Android)")
