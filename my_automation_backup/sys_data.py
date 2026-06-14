@@ -4,7 +4,8 @@ import time
 import threading
 import traceback
 import json
-import sqlite3
+import importlib
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pairs import (get_pairs_by_market, is_crypto_symbol,
                    get_real_currency_pairs, get_all_pairs)
 from data_sources.binance_ws   import BinanceWebSocket
@@ -13,94 +14,185 @@ from data_sources.finnhub_ws   import FinnhubWebSocket
 from data_sources.finnhub_rest import FinnhubREST
 from data_sources.iqoption_ws  import IQOptionWS
 
-# ==================== Direct imports from group_x ====================
+# ==================== Import all X modules ====================
 try:
-    from Groups.group_x.X01_klines_rest import fetch_and_update_ws
+    from Groups.group_x.X01_klines_rest import run_download as x01_download
 except ImportError:
-    fetch_and_update_ws = None
+    x01_download = None
     print("[WARN] X01_klines_rest not available")
 
 try:
-    from Groups.group_x.X03_cvd_rest import backfill_cvd_advanced
+    from Groups.group_x.X03_cvd_rest import run_download as x03_download
 except ImportError:
-    backfill_cvd_advanced = None
+    x03_download = None
     print("[WARN] X03_cvd_rest not available")
 
 try:
-    from Groups.group_x.X05_depth_rest import update_depth
+    from Groups.group_x.X05_depth_rest import run_download as x05_download
 except ImportError:
-    update_depth = None
+    x05_download = None
     print("[WARN] X05_depth_rest not available")
 
 try:
-    from Groups.group_x.X07_derivative_rest import DerivativeRest
+    from Groups.group_x.X07_derivative_rest import run_download as x07_download
 except ImportError:
-    DerivativeRest = None
+    x07_download = None
     print("[WARN] X07_derivative_rest not available")
 
 try:
-    from Groups.group_x.X13_liquidation_rest import LiquidationDataREST
+    from Groups.group_x.X09_correlation_rest import run_download as x09_download
 except ImportError:
-    LiquidationDataREST = None
+    x09_download = None
+    print("[WARN] X09_correlation_rest not available")
+
+try:
+    from Groups.group_x.X11_macro_rest import run_download as x11_download
+except ImportError:
+    x11_download = None
+    print("[WARN] X11_macro_rest not available")
+
+try:
+    from Groups.group_x.X13_liquidation_rest import run_download as x13_download
+except ImportError:
+    x13_download = None
     print("[WARN] X13_liquidation_rest not available")
 
 try:
-    from Groups.group_x.X19_volProfile_rest import VolumeProfile
+    from Groups.group_x.X15_session_rest import run_download as x15_download
 except ImportError:
-    VolumeProfile = None
+    x15_download = None
+    print("[WARN] X15_session_rest not available")
+
+try:
+    from Groups.group_x.X17_sentiment_rest import run_download as x17_download
+except ImportError:
+    x17_download = None
+    print("[WARN] X17_sentiment_rest not available")
+
+try:
+    from Groups.group_x.X19_volProfile_rest import run_download as x19_download
+except ImportError:
+    x19_download = None
     print("[WARN] X19_volProfile_rest not available")
 
 try:
-    from Groups.group_x.X21_mstructure_rest import MarketStructure
+    from Groups.group_x.X21_mstructure_rest import run_download as x21_download
 except ImportError:
-    MarketStructure = None
+    x21_download = None
     print("[WARN] X21_mstructure_rest not available")
 
-# Other disabled modules (keep as is)
 try:
-    from Groups.group_x.X08_derivative_ws import DerivativeWebSocket
+    from Groups.group_x.X23_onchain_rest import run_download as x23_download
 except ImportError:
-    DerivativeWebSocket = None
-
-try:
-    from Groups.group_x.X09_correlation_rest import CorrelationRest
-except ImportError:
-    CorrelationRest = None
-
-try:
-    from Groups.group_x.X10_correlation_ws import CorrelationWebSocket
-except ImportError:
-    CorrelationWebSocket = None
-
-try:
-    from Groups.group_x.X11_macro_rest import MacroDataFetcher
-except ImportError:
-    MacroDataFetcher = None
-
-try:
-    from Groups.group_x.X15_session_rest import session_collect
-except ImportError:
-    session_collect = None
-
-try:
-    from Groups.group_x.X17_sentiment_rest import SentimentData
-except ImportError:
-    SentimentData = None
-
-try:
-    from Groups.group_x.X23_onchain_rest import collect_and_save as onchain_collect
-except ImportError:
-    onchain_collect = None
+    x23_download = None
     print("[WARN] X23_onchain_rest not available")
 
 try:
-    from Groups.group_x.X25_tick_rest import tick_collect
+    from Groups.group_x.X25_tick_rest import run_download as x25_download
 except ImportError:
-    tick_collect = None
+    x25_download = None
     print("[WARN] X25_tick_rest not available")
-# ========================================================================
+
+# ==================== Import all P modules ====================
+try:
+    from Groups.group_p.P01_volatility_price_action import process_and_save as p01_process
+except ImportError:
+    p01_process = None
+    print("[WARN] P01_volatility_price_action not available")
+
+try:
+    from Groups.group_p.P02_cvd_flow import process_cvd as p02_process
+except ImportError:
+    p02_process = None
+    print("[WARN] P02_cvd_flow not available")
+
+try:
+    from Groups.group_p.P03_orderbook_imbalance import process_depth as p03_process
+except ImportError:
+    p03_process = None
+    print("[WARN] P03_orderbook_imbalance not available")
+
+try:
+    from Groups.group_p.P04_derivatives_flow import process_derivatives as p04_process
+except ImportError:
+    p04_process = None
+    print("[WARN] P04_derivatives_flow not available")
+
+try:
+    from Groups.group_p.P05_correlation_regime import process_correlation as p05_process
+except ImportError:
+    p05_process = None
+    print("[WARN] P05_correlation_regime not available")
+
+try:
+    from Groups.group_p.P06_macro_impact import process_macro as p06_process
+except ImportError:
+    p06_process = None
+    print("[WARN] P06_macro_impact not available")
+
+try:
+    from Groups.group_p.P07_liquidation_heat import process_liquidations as p07_process
+except ImportError:
+    p07_process = None
+    print("[WARN] P07_liquidation_heat not available")
+
+try:
+    from Groups.group_p.P08_session_activity import process_sessions as p08_process
+except ImportError:
+    p08_process = None
+    print("[WARN] P08_session_activity not available")
+
+try:
+    from Groups.group_p.P09_sentiment_contrarian import process_sentiment as p09_process
+except ImportError:
+    p09_process = None
+    print("[WARN] P09_sentiment_contrarian not available")
+
+try:
+    from Groups.group_p.P10_volume_profile import process_volume_profile as p10_process
+except ImportError:
+    p10_process = None
+    print("[WARN] P10_volume_profile not available")
+
+try:
+    from Groups.group_p.P11_market_structure import process_market_structure as p11_process
+except ImportError:
+    p11_process = None
+    print("[WARN] P11_market_structure not available")
+
+try:
+    from Groups.group_p.P12_onchain_capital import process_onchain as p12_process
+except ImportError:
+    p12_process = None
+    print("[WARN] P12_onchain_capital not available")
+
+try:
+    from Groups.group_p.P13_tick_flow import process_tick as p13_process
+except ImportError:
+    p13_process = None
+    print("[WARN] P13_tick_flow not available")
 
 print("[SysData] Loading...")
+
+# ==================== E modules list (for later execution) ====================
+E_MODULE_NAMES = [
+    "E01_candles_expert",
+    "E02_derivative_expert",
+    "E03_tick_expert",
+    "E04_cvd_expert",
+    "E05_depth_expert",
+    "E06_correlation_expert",
+    "E07_macro_expert",
+    "E08_liquidation_expert",
+    "E09_sessions_expert",
+    "E10_sentiment_expert",
+    "E11_volProfile_expert",
+    "E12_mstructure_expert",
+    "E13_onchain_expert",
+    "E14_regime_expert",
+    "E15_indicators_expert",
+    "E16_manipulation_expert"
+]
 
 # ── Global status tracking for call operations ──
 _fill_status = {}
@@ -117,7 +209,55 @@ def get_fill_status(symbol):
     with _status_lock:
         return _fill_status.get(symbol, {})
 
-# ── RealHandler (Binance + Finnhub) – updated for SQLite derivatives, liquidations, mstructure ──
+# ── Helper: check if .tmp_p file exists (single or multiple parts) ──
+def _tmp_p_exists(symbol, suffix=""):
+    """Return True if the required .tmp_p file(s) exist for the given component."""
+    clean = symbol.upper().replace("/", "").replace(" (OTC)", "").lower()
+    base_dir = os.path.join(os.path.dirname(__file__), "market_data", "binance", "symbols")
+    
+    # Special cases: CVD and VolProfile have two parts
+    if suffix == "cvd":
+        f1 = os.path.join(base_dir, f"{clean}_cvd1.tmp_p")
+        f2 = os.path.join(base_dir, f"{clean}_cvd2.tmp_p")
+        return os.path.exists(f1) and os.path.exists(f2)
+    elif suffix == "volProfile":
+        f1 = os.path.join(base_dir, f"{clean}_volProfile1.tmp_p")
+        f2 = os.path.join(base_dir, f"{clean}_volProfile2.tmp_p")
+        return os.path.exists(f1) and os.path.exists(f2)
+    else:
+        # Single file (including liquidations)
+        if suffix:
+            fname = f"{clean}_{suffix}.tmp_p"
+        else:
+            fname = f"{clean}.tmp_p"
+        path = os.path.join(base_dir, fname)
+        return os.path.exists(path)
+
+# Helper for .tmp_x existence (multi‑part support for X modules)
+def _tmp_x_exists(symbol, suffix=""):
+    """Return True if X module's .tmp_x file(s) exist. Handles multi‑part modules."""
+    clean = symbol.upper().replace("/", "").replace(" (OTC)", "").lower()
+    base_dir = os.path.join(os.path.dirname(__file__), "market_data", "binance", "symbols")
+    
+    # Multi‑part X modules: CVD and volProfile produce two files each
+    if suffix == "cvd":
+        f1 = os.path.join(base_dir, f"{clean}_cvd1.tmp_x")
+        f2 = os.path.join(base_dir, f"{clean}_cvd2.tmp_x")
+        return os.path.exists(f1) and os.path.exists(f2)
+    elif suffix == "volProfile":
+        f1 = os.path.join(base_dir, f"{clean}_volProfile1.tmp_x")
+        f2 = os.path.join(base_dir, f"{clean}_volProfile2.tmp_x")
+        return os.path.exists(f1) and os.path.exists(f2)
+    else:
+        # Single file
+        if suffix:
+            fname = f"{clean}_{suffix}.tmp_x"
+        else:
+            fname = f"{clean}.tmp_x"
+        path = os.path.join(base_dir, fname)
+        return os.path.exists(path)
+
+# ── RealHandler (Binance + Finnhub) ──
 class RealHandler:
     def __init__(self):
         self.binance_ws = BinanceWebSocket()
@@ -126,12 +266,6 @@ class RealHandler:
         self.finnhub_rest = FinnhubREST()
         self._started = False
         self.data_dir = os.path.join(os.path.dirname(__file__), "market_data", "binance")
-        self.derivative_rest = None
-        self.liquidation_rest = None
-        self.mstructure_rest = None
-        self.active_derivative_symbols = set()
-        self.active_liquidation_symbols = set()
-        self.active_mstructure_symbols = set()
 
     def start(self, pairs):
         if self._started:
@@ -183,283 +317,121 @@ class RealHandler:
     def stop(self):
         self.binance_ws.disconnect()
         self.finnhub_ws.disconnect()
-        if self.derivative_rest:
-            self.derivative_rest.stop()
-        if self.liquidation_rest:
-            self.liquidation_rest.stop()
-        if self.mstructure_rest:
-            self.mstructure_rest.stop()
 
-    # ---------- CVD (X03) – DISABLED ----------
-    def compute_and_save_cvd(self, symbol):
-        print(f"[CVD] Temporarily disabled", flush=True)
-        clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
-        update_status(clean, 'cvd', True)
-        return
-
-    # ---------- Depth (X05_depth_rest) – SQLite ----------
-    def activate_depth_for_symbol(self, symbol):
-        clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
-        print(f"[Depth] Activating for {clean}", flush=True)
-        if not is_crypto_symbol(clean):
-            print(f"[Depth] {clean} is not crypto, skipping", flush=True)
-            update_status(clean, 'depth', True)
-            return
-        if update_depth is None:
-            print(f"[Depth] X05_depth_rest.update_depth not available", flush=True)
-            update_status(clean, 'depth', False)
-            return
-        try:
-            update_depth(clean)
-            db_path = os.path.join(self.data_dir, "symbols", f"{clean.lower()}_depth.db")
-            if os.path.exists(db_path) and os.path.getsize(db_path) > 100:
-                update_status(clean, 'depth', True)
-                print(f"[Depth] Saved SQLite DB for {clean}", flush=True)
-            else:
-                update_status(clean, 'depth', False)
-        except Exception as e:
-            print(f"[Depth] Error: {e}", flush=True)
-            traceback.print_exc()
-            update_status(clean, 'depth', False)
-
-    # ---------- Derivative (X07) – SQLITE ----------
-    def _ensure_derivative_modules(self):
-        if DerivativeRest is not None and self.derivative_rest is None:
-            print("[Derivative] Initializing module...", flush=True)
-            self.derivative_rest = DerivativeRest(self.data_dir)
-
-    def activate_derivative_for_symbol(self, symbol):
-        clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
-        if DerivativeRest is None:
-            update_status(clean, 'derivative', False)
-            return
-        print(f"[Derivative] Activating for {clean}", flush=True)
-        if not is_crypto_symbol(clean):
-            print(f"[Derivative] {clean} is not crypto, skipping", flush=True)
-            update_status(clean, 'derivative', True)
-            return
-        try:
-            self._ensure_derivative_modules()
-            self.active_derivative_symbols.add(clean)
-            if self.derivative_rest:
-                self.derivative_rest.collect_and_save(clean)
-            db_path = os.path.join(self.data_dir, "symbols", f"{clean.lower()}_derivative.db")
-            if os.path.exists(db_path) and os.path.getsize(db_path) > 100:
-                update_status(clean, 'derivative', True)
-                print(f"[Derivative] Saved SQLite DB for {clean}", flush=True)
-            else:
-                update_status(clean, 'derivative', False)
-                print(f"[Derivative] DB not saved: {db_path}", flush=True)
-        except Exception as e:
-            print(f"[Derivative] Error: {e}", flush=True)
-            traceback.print_exc()
-            update_status(clean, 'derivative', False)
-
-    # ---------- Liquidations (X13) – SQLITE (enabled) ----------
-    def _ensure_liquidation_modules(self):
-        if LiquidationDataREST is not None and self.liquidation_rest is None:
-            print("[Liquidations] Initializing module...", flush=True)
-            self.liquidation_rest = LiquidationDataREST(self.data_dir)
-
-    def run_x13_liquidations(self, symbol):
-        clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
-        if LiquidationDataREST is None:
-            print("[Liquidations] Module not available", flush=True)
-            update_status(clean, 'liquidations', False)
-            return
-        print(f"[Liquidations] Starting for {clean}", flush=True)
-        if not is_crypto_symbol(clean):
-            print(f"[Liquidations] {clean} is not crypto, skipping", flush=True)
-            update_status(clean, 'liquidations', True)
-            return
-        try:
-            self._ensure_liquidation_modules()
-            if self.liquidation_rest:
-                self.liquidation_rest.collect_and_save(clean)
-            db_path = os.path.join(self.data_dir, "symbols", f"{clean.lower()}_liquidations.db")
-            if os.path.exists(db_path) and os.path.getsize(db_path) > 100:
-                update_status(clean, 'liquidations', True)
-                print(f"[Liquidations] Saved SQLite DB for {clean}", flush=True)
-            else:
-                update_status(clean, 'liquidations', False)
-        except Exception as e:
-            print(f"[Liquidations] Error: {e}", flush=True)
-            traceback.print_exc()
-            update_status(clean, 'liquidations', False)
-
-    # ---------- Market Structure (X21) – SQLITE (enabled) ----------
-    def _ensure_mstructure_modules(self):
-        if MarketStructure is not None and self.mstructure_rest is None:
-            print("[MStructure] Initializing module...", flush=True)
-            self.mstructure_rest = MarketStructure()
-
-    def run_x21_mstructure(self, symbol):
-        clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
-        if MarketStructure is None:
-            print("[MStructure] Module not available", flush=True)
-            update_status(clean, 'mstructure', False)
-            return
-        print(f"[MStructure] Starting for {clean}", flush=True)
-        if not is_crypto_symbol(clean):
-            print(f"[MStructure] {clean} is not crypto, skipping", flush=True)
-            update_status(clean, 'mstructure', True)
-            return
-        try:
-            self._ensure_mstructure_modules()
-            if self.mstructure_rest:
-                self.mstructure_rest.collect_and_save(clean)
-            db_path = os.path.join(self.data_dir, "symbols", f"{clean.lower()}_mstructure.db")
-            if os.path.exists(db_path) and os.path.getsize(db_path) > 100:
-                update_status(clean, 'mstructure', True)
-                print(f"[MStructure] Saved SQLite DB for {clean}", flush=True)
-            else:
-                update_status(clean, 'mstructure', False)
-        except Exception as e:
-            print(f"[MStructure] Error: {e}", flush=True)
-            traceback.print_exc()
-            update_status(clean, 'mstructure', False)
-
-    # ---------- Other disabled modules ----------
-    def activate_correlation_for_symbol(self, symbol):
-        print(f"[Correlation] Temporarily disabled", flush=True)
-        clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
-        update_status(clean, 'correlation', True)
-
-    def fetch_macro_data(self, symbol):
-        print(f"[Macro] Temporarily disabled", flush=True)
-        clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
-        update_status(clean, 'macro', True)
-
-    def run_x15_session(self, symbol):
-        print(f"[X15] Temporarily disabled", flush=True)
-        clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
-        update_status(clean, 'sessions', True)
-
-    def run_x17_sentiment(self, symbol):
-        print(f"[X17] Temporarily disabled", flush=True)
-        clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
-        update_status(clean, 'sentiment', True)
-
-    def run_x19_volprofile(self, symbol):
-        if VolumeProfile is None:
-            print("[X19] Module not available, skipping", flush=True)
-            return
-        clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
-        db_path = os.path.join(self.data_dir, "symbols", f"{clean.lower()}_volProfile.db")
-        old_toon = os.path.join(self.data_dir, "symbols", f"{clean.lower()}_volProfile.toon")
-        if os.path.exists(old_toon):
-            os.remove(old_toon)
-            print(f"[X19] Removed legacy .toon: {old_toon}", flush=True)
-        print("[X19] Starting volume profile analysis (SQLite)", flush=True)
-        try:
-            vp = VolumeProfile()
-            vp.collect_and_save(clean)
-            if os.path.exists(db_path) and os.path.getsize(db_path) > 100:
-                update_status(clean, 'volProfile', True)
-                print(f"[X19] SQLite DB saved: {db_path}", flush=True)
-            else:
-                update_status(clean, 'volProfile', False)
-                print(f"[X19] Failed to save SQLite DB: {db_path}", flush=True)
-        except Exception as e:
-            print(f"[X19] Error: {e}", flush=True)
-            traceback.print_exc()
-            update_status(clean, 'volProfile', False)
-
-    def run_x23_onchain(self, symbol):
-        print(f"[X23] Temporarily disabled", flush=True)
-        clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
-        update_status(clean, 'onchain', True)
-
-    def run_x25_tick(self, symbol):
-        print(f"[X25] Temporarily disabled", flush=True)
-        clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
-        update_status(clean, 'tick', True)
-
-    # ---------- call_single: starts all active threads ----------
+    # ---------- Run X then P, then E modules ----------
     def call_single(self, symbol, minutes=120):
         clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
-        print(f"[Call] Starting call for {clean}", flush=True)
-        if is_crypto_symbol(clean):
-            print("[Call] Step 1: Candles (via X01) -> SQLite .db", flush=True)
-            try:
-                if fetch_and_update_ws is None:
-                    raise Exception("X01 module not available")
-                success = fetch_and_update_ws(clean, self.binance_ws)
-                if success:
-                    update_status(clean, 'candles', True)
-                    print(f"[Call] Candles saved to {clean.lower()}.db", flush=True)
-                else:
-                    update_status(clean, 'candles', False)
-            except Exception as e:
-                print(f"[Call] X01 error: {e}", flush=True)
-                traceback.print_exc()
-                update_status(clean, 'candles', False)
+        print(f"[Call] Starting download for {clean} (parallel X+P, then E experts)", flush=True)
 
-            print("[Call] Step 2: Depth (X05_depth_rest) -> SQLite .db", flush=True)
+        def run_x_then_p(module_name, x_func, p_func, suffix):
+            # SPECIAL HANDLING FOR LIQUIDATIONS: wait for CVD to complete first
+            if module_name == "liquidations":
+                print(f"[Call] Waiting for CVD module to complete before running liquidations...", flush=True)
+                # Wait up to 90 seconds for CVD .tmp_p files to appear
+                timeout = 90
+                start_wait = time.time()
+                while (time.time() - start_wait) < timeout:
+                    if _tmp_p_exists(clean, "cvd"):
+                        print(f"[Call] CVD ready after {int(time.time()-start_wait)}s, proceeding with liquidations", flush=True)
+                        break
+                    time.sleep(2)
+                else:
+                    print(f"[Call] Timeout waiting for CVD (90s), skipping liquidation processing", flush=True)
+                    update_status(clean, module_name, False)
+                    return
+
+            print(f"[Call] Running X{module_name}...", flush=True)
             try:
-                if update_depth is not None:
-                    update_depth(clean)
-                    db_path = os.path.join(self.data_dir, "symbols", f"{clean.lower()}_depth.db")
-                    if os.path.exists(db_path) and os.path.getsize(db_path) > 100:
-                        update_status(clean, 'depth', True)
-                        print(f"[Depth] Saved SQLite DB for {clean}", flush=True)
+                if x_func is None:
+                    update_status(clean, module_name, False)
+                    print(f"[Call] X{module_name} not available", flush=True)
+                    return
+                x_func(clean)
+                x_exists = _tmp_x_exists(clean, suffix)
+                if not x_exists:
+                    print(f"[Call] X{module_name} failed to produce .tmp_x", flush=True)
+                    update_status(clean, module_name, False)
+                    return
+                # X successful, now run P module
+                print(f"[Call] Running P{module_name} (processing) for {clean}...", flush=True)
+                if p_func is None:
+                    print(f"[Call] P{module_name} not available, skipping", flush=True)
+                    p_success = False
+                else:
+                    p_func(clean)
+                    # For multi‑part modules, check all required .tmp_p files
+                    if module_name in ("cvd", "volProfile"):
+                        p_success = _tmp_p_exists(clean, suffix)
                     else:
-                        update_status(clean, 'depth', False)
+                        p_success = _tmp_p_exists(clean, suffix)
+                if p_success:
+                    update_status(clean, module_name, True)
+                    print(f"[Call] P{module_name} success -> {clean}_{suffix}.tmp_p (or parts)", flush=True)
                 else:
-                    update_status(clean, 'depth', False)
+                    update_status(clean, module_name, False)
+                    print(f"[Call] P{module_name} failed to produce .tmp_p", flush=True)
             except Exception as e:
-                print(f"[Depth] Error: {e}", flush=True)
+                print(f"[Call] X/P {module_name} error: {e}", flush=True)
                 traceback.print_exc()
-                update_status(clean, 'depth', False)
+                update_status(clean, module_name, False)
 
-            print("[Call] Step 3: Starting background tasks (Derivative, Liquidations, MStructure, VolProfile)", flush=True)
+        # Step 1: Run X01 + P01 (candles) sequentially first
+        run_x_then_p("candles", x01_download, p01_process, "")
+        print("[Call] X01+P01 completed.", flush=True)
 
-            # Derivative
-            t_deriv = threading.Thread(target=self.activate_derivative_for_symbol, args=(clean,), daemon=True)
-            # Liquidations
-            t_liq = threading.Thread(target=self.run_x13_liquidations, args=(clean,), daemon=True)
-            # MStructure
-            t_mstruct = threading.Thread(target=self.run_x21_mstructure, args=(clean,), daemon=True)
-            # VolProfile
-            t_vol = threading.Thread(target=self.run_x19_volprofile, args=(clean,), daemon=True)
+        remaining = [
+            ("cvd",           x03_download, p02_process, "cvd"),
+            ("depth",         x05_download, p03_process, "depth"),
+            ("derivative",    x07_download, p04_process, "derivative"),
+            ("correlation",   x09_download, p05_process, "correlation"),
+            ("macro",         x11_download, p06_process, "macro"),
+            ("liquidations",  x13_download, p07_process, "liquidations"),
+            ("sessions",      x15_download, p08_process, "sessions"),
+            ("sentiment",     x17_download, p09_process, "sentiment"),
+            ("volProfile",    x19_download, p10_process, "volProfile"),
+            ("mstructure",    x21_download, p11_process, "mstructure"),
+            ("onchain",       x23_download, p12_process, "onchain"),
+            ("tick",          x25_download, p13_process, "tick"),
+        ]
 
-            t_deriv.start()
-            t_liq.start()
-            t_mstruct.start()
-            t_vol.start()
+        print(f"[Call] Running {len(remaining)} modules in parallel (X+P)...", flush=True)
+        with ThreadPoolExecutor(max_workers=len(remaining)) as executor:
+            futures = {}
+            for name, xf, pf, sfx in remaining:
+                future = executor.submit(run_x_then_p, name, xf, pf, sfx)
+                futures[future] = name
+            for future in as_completed(futures):
+                name = futures[future]
+                try:
+                    future.result()
+                except Exception as e:
+                    print(f"[Call] {name} thread exception: {e}", flush=True)
 
-            print("[Call] Started background tasks: Derivative, Liquidations, MStructure, VolProfile", flush=True)
-        else:
-            print(f"[Call] Non-crypto {clean}, only candles", flush=True)
+        # ========== After all X+P modules, run E experts ==========
+        print(f"[Call] All X+P modules completed for {clean}, now running E experts...", flush=True)
+        for mod_name in E_MODULE_NAMES:
             try:
-                self.finnhub_rest.fill_gaps(clean, minutes=minutes)
-                candles = self.finnhub_rest.get_candles_for_symbol(clean)
-                if candles:
-                    self.finnhub_ws.add_candles(clean, candles)
-                candles_file = os.path.join(self.data_dir, "symbols", f"{clean.lower()}.tsv")
-                if os.path.exists(candles_file):
-                    update_status(clean, 'candles', True)
+                # Dynamically import the module from Groups.group_e
+                module = importlib.import_module(f"Groups.group_e.{mod_name}")
+                if hasattr(module, "run_expert"):
+                    print(f"[Call] Running E expert: {mod_name}...", flush=True)
+                    module.run_expert(clean)
                 else:
-                    update_status(clean, 'candles', False)
+                    print(f"[Call] Module {mod_name} has no run_expert function, skipping", flush=True)
+            except ImportError as e:
+                print(f"[Call] Could not import E module {mod_name}: {e}", flush=True)
             except Exception as e:
-                print(f"[Call] Non-crypto error: {e}", flush=True)
-                update_status(clean, 'candles', False)
-            # For non-crypto, set all derivative-related status as true (or false if you prefer)
-            update_status(clean, 'cvd', True)
-            update_status(clean, 'depth', True)
-            update_status(clean, 'derivative', True)
-            update_status(clean, 'correlation', True)
-            update_status(clean, 'liquidations', True)
-            update_status(clean, 'mstructure', True)
+                print(f"[Call] Error running E module {mod_name}: {e}", flush=True)
+                traceback.print_exc()
 
-        print(f"[Call] call_single main thread finished (background tasks running)", flush=True)
+        print(f"[Call] All modules (X, P, E) completed for {clean}", flush=True)
 
     def get_candle_count(self, symbol):
         if not self._started:
             return 0
         return self.get_closed_count(symbol, "1m")
 
-# ── IQOptionHandler, QuotexHandler (unchanged) ──
+# ── IQOptionHandler and QuotexHandler (unchanged) ──
 class IQOptionHandler:
     def __init__(self, email="", password=""):
         self.ws = IQOptionWS()
@@ -484,13 +456,9 @@ class IQOptionHandler:
     def call_single(self, symbol, minutes=60):
         print(f"[IQOptionHandler] Manual call not implemented for {symbol}", flush=True)
         clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
-        update_status(clean, 'candles', True)
-        update_status(clean, 'cvd', True)
-        update_status(clean, 'depth', True)
-        update_status(clean, 'derivative', True)
-        update_status(clean, 'correlation', True)
-        update_status(clean, 'liquidations', True)
-        update_status(clean, 'mstructure', True)
+        for comp in ["candles", "cvd", "depth", "derivative", "correlation", "macro",
+                     "liquidations", "sessions", "sentiment", "volProfile", "mstructure", "onchain", "tick"]:
+            update_status(clean, comp, True)
     def get_candle_count(self, symbol):
         return self.get_closed_count(symbol, "1m")
 
@@ -514,17 +482,13 @@ class QuotexHandler:
     def call_single(self, symbol, minutes=60):
         print(f"[QuotexHandler] Manual call not implemented for {symbol}", flush=True)
         clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
-        update_status(clean, 'candles', True)
-        update_status(clean, 'cvd', True)
-        update_status(clean, 'depth', True)
-        update_status(clean, 'derivative', True)
-        update_status(clean, 'correlation', True)
-        update_status(clean, 'liquidations', True)
-        update_status(clean, 'mstructure', True)
+        for comp in ["candles", "cvd", "depth", "derivative", "correlation", "macro",
+                     "liquidations", "sessions", "sentiment", "volProfile", "mstructure", "onchain", "tick"]:
+            update_status(clean, comp, True)
     def get_candle_count(self, symbol):
         return 0
 
-# ── Helper to clean dummy status strings ──
+# ── Helper to clean dummy status strings (unchanged) ──
 def _clean_status(val):
     dummy_placeholders = ["--", "--", "--", "--", "--", "--", "--", "--", "--", "--", "--"]
     if val in dummy_placeholders:
@@ -633,19 +597,7 @@ class SysData:
         return self._platform
 
     def get_data_age(self, symbol, data_type='candles'):
-        clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
-        base_dir = os.path.join(os.path.dirname(__file__), "market_data", "binance", "symbols")
-        if data_type == 'candles':
-            filepath = os.path.join(base_dir, f"{clean.lower()}.db")
-        else:
-            filepath = os.path.join(base_dir, f"{clean.lower()}_{data_type}.db")
-        if not os.path.exists(filepath):
-            return None
-        try:
-            mtime = os.path.getmtime(filepath)
-            return int(time.time() - mtime)
-        except Exception:
-            return None
+        return None
 
     def _feel(self, symbol: str, interval: str) -> dict:
         if not self._platform:
@@ -685,25 +637,7 @@ class SysData:
         return self._platform.get_candles(symbol, interval, limit)
 
     def get_file_status(self, symbol: str) -> dict:
-        clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
-        base_dir = os.path.join(os.path.dirname(__file__), "market_data", "binance", "symbols")
-        db_path = os.path.join(base_dir, f"{clean.lower()}.db")
-        if not os.path.exists(db_path):
-            return {"exists": False, "candles": 0, "age_sec": 0, "gap": 0, "stale": True}
-        try:
-            mtime = os.path.getmtime(db_path)
-            age = int(time.time() - mtime)
-            stale = age > 300
-            return {
-                "exists": True,
-                "candles": 1,
-                "age_sec": age,
-                "gap": 0,
-                "stale": stale
-            }
-        except Exception as e:
-            print(f"[SysData] get_file_status error for {symbol}: {e}", flush=True)
-            return {"exists": True, "candles": 0, "age_sec": 9999, "gap": 0, "stale": True}
+        return {"exists": False, "candles": 0, "age_sec": 0, "gap": 0, "stale": True}
 
     def get_ws_alive(self, symbol: str, max_age_sec: int = 120) -> bool:
         if not self._platform or self._current_platform_name != "real":
@@ -953,4 +887,4 @@ class SysData:
             return 0
         return self._platform.get_candle_count(symbol)
 
-print("✅ [SysData] Loaded OK – Derivative, Liquidations, MStructure now SQLite", flush=True)
+print("✅ [SysData] Loaded OK – X modules produce .tmp_x, P modules produce .tmp_p, E modules run after all P", flush=True)
