@@ -3,6 +3,11 @@ Z10_checker.py – Background pre‑flight scorer (5 sec interval, TSV cache)
 No dummy data – uses "No data" for missing/neutral statuses.
 Module availability check: only returns data for factors whose corresponding Z module exists.
 Output file: market_data/checker.tsv (with header indicating Z‑group)
+
+Reduced logging:
+- Log file cleared on every start (or when terminal restarts).
+- Only error logs and brief summaries (once per minute) are written.
+- Log file auto‑rotates when exceeding 1 MB.
 """
 
 import os
@@ -18,20 +23,45 @@ NEWS_DIR = os.path.join(BASE_DIR, "market_data", "news")
 CACHE_TSV = os.path.join(BASE_DIR, "market_data", "checker.tsv")
 DEBUG_LOG = os.path.join(BASE_DIR, "market_data", "checker_debug.log")
 
-# Configure logging with immediate flush
-for handler in logging.root.handlers[:]:
-    logging.root.removeHandler(handler)
+# ---------- Clear log file on start ----------
+try:
+    with open(DEBUG_LOG, 'w') as f:
+        f.write(f"# Log started at {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+except:
+    pass
+
+# ---------- Simple size‑based rotation ----------
+def rotate_log_if_needed():
+    if not os.path.exists(DEBUG_LOG):
+        return
+    size = os.path.getsize(DEBUG_LOG)
+    if size > 1_000_000:   # 1 MB
+        backup = DEBUG_LOG + ".old"
+        try:
+            os.replace(DEBUG_LOG, backup)
+        except:
+            pass
+        # start fresh
+        with open(DEBUG_LOG, 'w') as f:
+            f.write(f"# Log rotated at {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+
+# ---------- Setup logging (only errors + periodic summary) ----------
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)   # We'll control what we log manually
+
+# Clear existing handlers
+for handler in logger.handlers[:]:
+    logger.removeHandler(handler)
+
 file_handler = logging.FileHandler(DEBUG_LOG, mode='a', encoding='utf-8')
-file_handler.setLevel(logging.DEBUG)
+file_handler.setLevel(logging.INFO)
 console_handler = logging.StreamHandler()
 console_handler.setLevel(logging.INFO)
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 file_handler.setFormatter(formatter)
 console_handler.setFormatter(formatter)
-logging.root.addHandler(file_handler)
-logging.root.addHandler(console_handler)
-logging.root.setLevel(logging.DEBUG)
-logger = logging.getLogger(__name__)
+logger.addHandler(file_handler)
+logger.addHandler(console_handler)
 
 # Helper: check if a Z module file exists
 def _is_z_module_available(module_filename):
@@ -342,11 +372,11 @@ def start_background_updater(symbols_list, interval_sec=5):
                 if _is_z_module_available("Z01_news.py"):
                     from Groups.group_z.Z01_news import is_news_ready
                     if is_news_ready():
-                        logging.info("News module ready, starting background updates")
+                        logger.info("News module ready, starting background updates")
                         print("[Checker] News module ready, starting background updates")
                         return
                 else:
-                    logging.info("No news module, starting background updates without news")
+                    logger.info("No news module, starting background updates without news")
                     print("[Checker] No news module, starting background updates without news")
                     return
             except:
@@ -355,11 +385,16 @@ def start_background_updater(symbols_list, interval_sec=5):
 
     def updater():
         wait_for_news()
-        logging.info("Background updater started")
+        logger.info("Background updater started")
+        print("[Checker] Background updater started (5 sec cycle, reduced logging)")
         time.sleep(2)
+        cycle_count = 0
         while True:
             start_time = time.time()
-            logging.debug("Starting scoring cycle")
+            # Log only once per minute (every 12 cycles of 5 sec)
+            cycle_count += 1
+            log_this_cycle = (cycle_count % 12 == 0)   # every minute
+
             results = {}
             for sym in symbols_list:
                 clean = sym.upper().replace('/', '').replace(' (OTC)', '')
@@ -368,12 +403,13 @@ def start_background_updater(symbols_list, interval_sec=5):
                     news_word = pf['news_status']
                     results[clean] = (pf, news_word)
                 except Exception as e:
-                    logging.error(f"Error for {clean}: {e}")
-                    print(f"[Checker] Error for {clean}: {e}")
+                    if log_this_cycle:
+                        logger.error(f"Error for {clean}: {e}")
+                        print(f"[Checker] Error for {clean}: {e}")
+
             try:
                 os.makedirs(os.path.dirname(CACHE_TSV), exist_ok=True)
                 with open(CACHE_TSV, 'w', encoding='utf-8') as f:
-                    # ========== ADD HEADER COMMENT INDICATING Z‑GROUP ==========
                     f.write("# Z-group pre-flight scores (generated by Z10_checker.py)\n")
                     f.write("timestamp\tsymbol\ttotal_score\tdecision\tsr\tregime\tnews\tvol\tcorr\tspread\torderflow\tadr\tnews_sentiment\tnews_word\n")
                     now = int(time.time())
@@ -381,15 +417,20 @@ def start_background_updater(symbols_list, interval_sec=5):
                         statuses = data['statuses']
                         line = f"{now}\t{sym}\t{data['total']}\t{data['decision']}\t{statuses['sr']}\t{statuses['trend']}\t{statuses['news']}\t{statuses['volatility']}\t{statuses['correlation']}\t{statuses['spread']}\t{statuses['orderflow']}\t{statuses['adr']}\t{data['news_sentiment']}\t{word}\n"
                         f.write(line)
-                logging.debug(f"Checker.tsv written with {len(results)} entries")
-                print(f"[Checker] Successfully wrote {len(results)} entries to checker.tsv")
+                if log_this_cycle:
+                    logger.info(f"Wrote {len(results)} entries to checker.tsv")
+                    print(f"[Checker] Wrote {len(results)} entries to checker.tsv")
             except Exception as e:
-                logging.error(f"TSV write error: {e}")
+                logger.error(f"TSV write error: {e}")
                 print(f"[Checker] TSV write error: {e}")
+
+            # Check log file size and rotate if needed
+            rotate_log_if_needed()
+
             elapsed = time.time() - start_time
             sleep_time = max(0, interval_sec - elapsed)
-            logging.debug(f"Cycle took {elapsed:.2f}s, sleeping {sleep_time:.2f}s")
-            time.sleep(sleep_time)
+            if sleep_time > 0:
+                time.sleep(sleep_time)
 
     thread = threading.Thread(target=updater, daemon=True)
     thread.start()
@@ -405,3 +446,6 @@ def get_gatekeeper(symbol, z_score=None, a_score=None, interval=None, rows=None)
         "news_status": pf['news_status'],
         "news_sentiment": pf['news_sentiment']
     }
+
+# Optional: news storage in a global variable (not used here but can be added if needed)
+_global_news_cache = {}
