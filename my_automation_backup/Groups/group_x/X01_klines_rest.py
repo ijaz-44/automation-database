@@ -1,13 +1,10 @@
 #!/usr/bin/env python3
 """
-X01_klines_rest.py – Raw Candle Fetcher + E01 Expert + Aggressive Event Compression
+X01_klines_rest.py – Raw Candle Downloader (Only .tmp_x + Global Log)
 - Fetches candles (limits: 1m:200,5m:180,15m:120,1h:120,4h:80)
-- Writes raw candles to temporary TSV
-- Calls E01 to get raw rows (limited) and events (identical merged)
-- Applies second‑level compression: merges consecutive events with same direction
-- Writes final TSV order: RAW rows → HIGH_PROB_SCENARIO → EVENT rows
-- Logs to market_data/binance/symbols/candle_issues.log
-- Deletes temporary raw TSV
+- Writes raw candles to temporary TSV: {symbol}.tmp_x
+- Logs issues to market_data/binance/symbols/X01_candles.log (global, append)
+- No processing, no E01, no compression, no final TSV.
 """
 
 import os
@@ -18,18 +15,6 @@ import random
 import json
 import shutil
 from typing import List, Dict, Tuple
-
-# ========== Import E01 from group_e ==========
-try:
-    from Groups.group_e.E01_candles_expert import (
-        load_and_prepare,
-        compute_all_patterns_and_events,
-        compute_high_prob_scenario
-    )
-    E01_AVAILABLE = True
-except ImportError:
-    E01_AVAILABLE = False
-    print("[X01] ERROR: E01_candles_expert not found in Groups/group_e/. Final TSV will not be generated.")
 
 # ========== CONFIGURATION ==========
 TIMEFRAME_SECONDS = {"1m":60,"5m":300,"15m":900,"1h":3600,"4h":14400}
@@ -52,11 +37,32 @@ REQUEST_TIMEOUT = 10
 RATE_PER_SEC = 10
 RATE_BURST = 5
 FEATURES_BASE_DIR = os.path.join("market_data", "binance", "symbols")
-LOG_FILE = os.path.join(FEATURES_BASE_DIR, "candle_issues.log")
-LOG_MAX_SIZE = 5_000_000
 TIMEFRAME_FETCH_TIMEOUT = 25
 
 os.makedirs(FEATURES_BASE_DIR, exist_ok=True)
+
+# ========== GLOBAL LOG FILE ==========
+LOG_FILE = os.path.join(FEATURES_BASE_DIR, "X01_candles.log")
+LOG_MAX_SIZE = 5 * 1024 * 1024  # 5 MB
+
+def rotate_log_if_needed():
+    if os.path.exists(LOG_FILE) and os.path.getsize(LOG_FILE) > LOG_MAX_SIZE:
+        backup = LOG_FILE + ".old"
+        try:
+            os.replace(LOG_FILE, backup)
+        except:
+            pass
+
+def log_issue(level, msg, **kwargs):
+    """Append to global log file X01_candles.log"""
+    rotate_log_if_needed()
+    ts = time.strftime("%Y-%m-%d %H:%M:%S")
+    line = f"{ts} [{level}] {msg}"
+    if kwargs:
+        line += " " + json.dumps(kwargs)
+    print(line)
+    with open(LOG_FILE, "a", encoding="utf-8") as f:
+        f.write(line + "\n")
 
 # ========== SYMBOL VALIDATION ==========
 def is_valid_symbol(symbol: str) -> bool:
@@ -73,25 +79,6 @@ def check_disk_space():
     except Exception as e:
         log_issue("ERROR", "Pre‑flight check failed", error=str(e))
         raise
-
-# ========== LOGGER ==========
-def rotate_log_if_needed():
-    if os.path.exists(LOG_FILE) and os.path.getsize(LOG_FILE) > LOG_MAX_SIZE:
-        backup = LOG_FILE + ".old"
-        try:
-            os.replace(LOG_FILE, backup)
-        except:
-            pass
-
-def log_issue(level, msg, **kwargs):
-    ts = time.strftime("%Y-%m-%d %H:%M:%S")
-    line = f"{ts} [{level}] {msg}"
-    if kwargs:
-        line += " " + json.dumps(kwargs)
-    print(line)
-    rotate_log_if_needed()
-    with open(LOG_FILE, "a") as f:
-        f.write(line + "\n")
 
 # ========== RATE LIMITER ==========
 class RateLimiter:
@@ -120,7 +107,7 @@ adapter = requests.adapters.HTTPAdapter(max_retries=0)
 _session.mount("https://", adapter)
 _session.mount("http://", adapter)
 
-# ========== FETCH CANDLES (same as before) ==========
+# ========== FETCH CANDLES ==========
 def fetch_candles(symbol: str, interval: str, limit: int, timeout_sec: float) -> Tuple[List[Dict], bool, int, str]:
     fetch_start = time.time()
     symbol = symbol.upper()
@@ -192,84 +179,24 @@ def fetch_candles(symbol: str, interval: str, limit: int, timeout_sec: float) ->
     return [], False, 0, ""
 
 def write_raw_tsv(symbol: str, candles_by_tf: Dict[str, List[Dict]], tmp_tsv_path: str):
+    """Write raw candles to temporary TSV (one row per candle)."""
     with open(tmp_tsv_path, "w") as f:
         for tf in sorted(candles_by_tf.keys()):
             for c in candles_by_tf[tf]:
                 f.write(f"{symbol.upper()}\t{tf}\t{c['timestamp_ms']}\t{c['open']}\t{c['high']}\t{c['low']}\t{c['close']}\t{c['volume']}\n")
     log_issue("INFO", f"Raw TSV written: {tmp_tsv_path}", rows=sum(len(v) for v in candles_by_tf.values()))
 
-# ========== FUNCTION TO GET DIRECTION FROM PATTERN CODE ==========
-def pattern_direction(pat_code):
-    bullish = {'3WS','4WS','MRS','BUE','HAB','HBR','PIE','TZB','HAF','WHM','LWC','HAM','INV','BUH','RUP'}
-    bearish = {'3BC','4BC','EVS','BRE','HBB','HBE','DCC','TZT','HBF','BLM','LBC','BRH','RDN'}
-    if pat_code in bullish: return 1
-    if pat_code in bearish: return -1
-    return 0
-
-def compress_events_by_direction(events):
-    if not events:
-        return []
-    dir_events = []
-    for ev in events:
-        d = pattern_direction(ev['pattern'])
-        if d == 0:
-            continue
-        dir_events.append({
-            'start_ts': ev['start_ts'],
-            'end_ts': ev['end_ts'],
-            'duration': ev['duration'],
-            'strength': ev['strength'],
-            'pattern': ev['pattern'],
-            'direction': d
-        })
-    if not dir_events:
-        return []
-    merged = []
-    curr = dir_events[0].copy()
-    curr['first_pattern'] = curr['pattern']
-    curr['last_pattern'] = curr['pattern']
-    curr['duration_sum'] = curr['duration']
-    curr['strength_sum'] = curr['strength']
-    for ev in dir_events[1:]:
-        if ev['direction'] == curr['direction']:
-            curr['end_ts'] = ev['end_ts']
-            curr['duration_sum'] += ev['duration']
-            curr['strength_sum'] += ev['strength']
-            curr['last_pattern'] = ev['pattern']
-        else:
-            merged.append({
-                'start_ts': curr['start_ts'],
-                'end_ts': curr['end_ts'],
-                'duration': curr['duration_sum'],
-                'strength': curr['strength_sum'],
-                'first_pattern': curr['first_pattern'],
-                'last_pattern': curr['last_pattern'],
-                'direction': 'BULL' if curr['direction'] == 1 else 'BEAR'
-            })
-            curr = ev.copy()
-            curr['first_pattern'] = curr['pattern']
-            curr['last_pattern'] = curr['pattern']
-            curr['duration_sum'] = curr['duration']
-            curr['strength_sum'] = curr['strength']
-    merged.append({
-        'start_ts': curr['start_ts'],
-        'end_ts': curr['end_ts'],
-        'duration': curr['duration_sum'],
-        'strength': curr['strength_sum'],
-        'first_pattern': curr['first_pattern'],
-        'last_pattern': curr['last_pattern'],
-        'direction': 'BULL' if curr['direction'] == 1 else 'BEAR'
-    })
-    return merged
-
-# ========== MAIN PIPELINE ==========
-def run_overwrite(symbol: str):
+# ========== MAIN DOWNLOADER ==========
+def run_download(symbol: str) -> bool:
+    """Only download candles and save as {symbol}.tmp_x, log to global X01_candles.log"""
     if not is_valid_symbol(symbol):
-        log_issue("ERROR", "Invalid symbol", symbol=symbol)
+        print(f"[X01] Invalid symbol: {symbol}")
+        log_issue("ERROR", f"Invalid symbol: {symbol}")
         return False
 
-    raw_tsv_path = os.path.join(FEATURES_BASE_DIR, f"{symbol.lower()}_raw.tmp.tsv")
+    log_issue("INFO", f"=== Starting download for {symbol} ===")
     try:
+        tmp_x_path = os.path.join(FEATURES_BASE_DIR, f"{symbol.lower()}.tmp_x")
         check_disk_space()
         timeframes = ["1m","5m","15m","1h","4h"]
         fetched = {}
@@ -286,61 +213,20 @@ def run_overwrite(symbol: str):
             if max_gap:
                 log_issue("WARNING", f"Gap in {tf}", max_gap_ms=max_gap, type=gap_type)
 
-        write_raw_tsv(symbol, fetched, raw_tsv_path)
-
-        if not E01_AVAILABLE:
-            log_issue("ERROR", "E01_candles_expert not available. Cannot generate final TSV.")
-            return False
-
-        data_by_tf, _ = load_and_prepare(raw_tsv_path)
-        if data_by_tf.get('4h') is None or data_by_tf.get('1h') is None:
-            log_issue("ERROR", "Missing 4H or 1H data")
-            return False
-
-        raw_1m, events_by_tf, raw_rows_by_tf = compute_all_patterns_and_events(data_by_tf)
-
-        # Compress events by direction
-        compressed_events_by_tf = {}
-        for tf in events_by_tf:
-            compressed_events_by_tf[tf] = compress_events_by_direction(events_by_tf[tf])
-
-        # Get high‑probability scenario
-        direction, prob, reason = compute_high_prob_scenario(data_by_tf, raw_1m, events_by_tf)
-
-        final_tsv_path = os.path.join(FEATURES_BASE_DIR, f"{symbol.lower()}.tsv")
-        with open(final_tsv_path, 'w') as out:
-            out.write("timestamp\ttype\ttimeframe\tpattern\tduration\tstrength\tfirst_pattern\tlast_pattern\tdirection\tstart_ts\tend_ts\n")
-            # 1. Write raw rows
-            for tf in ['1m','5m','15m','1h','4h']:
-                for r in raw_rows_by_tf.get(tf, []):
-                    out.write(f"{r['timestamp']}\tRAW\t{tf}\t{r['patterns']}\t\t\t\t\t\t\t\n")
-            # 2. Write HIGH_PROB_SCENARIO row (conclusion) right after raw candles
-            out.write(f"HIGH_PROB_SCENARIO\t{direction}\t{prob}\t{reason}\t\t\t\t\t\t\t\n")
-            # 3. Write event rows (compressed directional blocks)
-            for tf in ['1m','5m','15m','1h','4h']:
-                for ev in compressed_events_by_tf.get(tf, []):
-                    out.write(f"{ev['start_ts']}\tEVENT\t{tf}\t{ev['first_pattern']}\t{ev['duration']}\t{ev['strength']}\t{ev['first_pattern']}\t{ev['last_pattern']}\t{ev['direction']}\t{ev['start_ts']}\t{ev['end_ts']}\n")
-
-        log_issue("INFO", f"Final TSV written: {final_tsv_path}")
-
+        write_raw_tsv(symbol, fetched, tmp_x_path)
+        log_issue("INFO", f"Download complete -> {tmp_x_path}")
         return True
     except Exception as e:
-        log_issue("ERROR", f"Overwrite failed for {symbol}", error=str(e))
+        log_issue("ERROR", f"Download failed for {symbol}", error=str(e))
         return False
-    finally:
-        if os.path.exists(raw_tsv_path):
-            try:
-                os.remove(raw_tsv_path)
-                log_issue("INFO", f"Removed temporary raw file: {raw_tsv_path}")
-            except:
-                pass
 
+# ========== EXPORTED FUNCTIONS ==========
 def fetch_and_update_ws(symbol: str, ws_instance=None):
-    return run_overwrite(symbol)
+    return run_download(symbol)
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Usage: python X01_klines_rest.py SYMBOL")
         sys.exit(1)
-    success = run_overwrite(sys.argv[1].upper())
+    success = run_download(sys.argv[1].upper())
     sys.exit(0 if success else 1)
