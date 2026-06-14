@@ -1,13 +1,18 @@
+#!/usr/bin/env python3
 """
-X23 - On‑Chain Data Module (Optimized for Speed & Minimum Calls)
-- Parallel Binance API calls (ThreadPoolExecutor)
-- Global cache for stablecoin inflow (5 min)
-- Whale alerts: 10+ public APIs (up to 100 whales)
-- All original data preserved (stablecoin, netflow, liquidations, ATR, depth, predictions)
-- Fast completion (3-5 sec per symbol)
+X23_onchain_rest.py – Raw On‑Chain Data Downloader (Only .tmp_x)
+- Fetches stablecoin inflow (USDT, USDC) from DeFiLlama (cached 5 min)
+- Fetches Binance futures metrics (liquidations, whale ratio, taker ratio, funding rate, OI) in parallel
+- Fetches spot depth imbalance, ATR, current price
+- Fetches exchange netflow (BTC/ETH only)
+- Fetches whale alerts from 10+ public APIs
+- Writes raw TSV: {symbol}_onchain.tmp_x (overwrites each call)
+- Logs to market_data/binance/symbols/X23_onchain.log
+- No prediction, no scoring, no TOON.
 """
 
 import os
+import sys
 import time
 import json
 import glob
@@ -16,80 +21,52 @@ import math
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+# ========== CONFIGURATION ==========
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SYMBOLS_DIR = os.path.join(BASE_DIR, "market_data", "binance", "symbols")
 os.makedirs(SYMBOLS_DIR, exist_ok=True)
 
-LOG_FILE = os.path.join(SYMBOLS_DIR, "onchain_issues.log")
-MAX_LOG_SIZE_BYTES = 5 * 1024 * 1024
+# Log file name changed to X23_onchain.log
+LOG_FILE = os.path.join(SYMBOLS_DIR, "X23_onchain.log")
+LOG_MAX_SIZE = 5 * 1024 * 1024
+
 CMC_API_KEY = "36a9dba86c4d49c7b74a0ca49728d7d2"
 BINANCE_FUTURES_BASE = "https://fapi.binance.com"
 BINANCE_SPOT_BASE = "https://api.binance.com/api/v3"
 
-# API keys for explorers (optional, but recommended)
 ETHERSCAN_API_KEY = "YOUR_ETHERSCAN_API_KEY"
 BSCSCAN_API_KEY = "YOUR_BSCSCAN_API_KEY"
-POLYGONSCAN_API_KEY = "YOUR_POLYGONSCAN_API_KEY"
 WHALE_ALERT_API_KEY = "YOUR_WHALE_ALERT_API_KEY"
-
-_log_console = True
 
 # Global cache for stablecoin inflow (5 minutes)
 _stable_cache = {"data": None, "timestamp": 0}
 _STABLE_TTL = 300
 
+# ========== LOGGING ==========
 def rotate_log_if_needed():
     if not os.path.exists(LOG_FILE):
         return
-    if os.path.getsize(LOG_FILE) > MAX_LOG_SIZE_BYTES:
+    if os.path.getsize(LOG_FILE) > LOG_MAX_SIZE:
         try:
             with open(LOG_FILE, 'r', encoding='utf-8') as f:
                 lines = f.readlines()
             keep_lines = lines[-5000:] if len(lines) > 5000 else lines
             with open(LOG_FILE, 'w', encoding='utf-8') as f:
                 f.writelines(keep_lines)
-            print("[X23] Log rotated (kept last 5000 lines)")
         except:
             pass
 
-def log_issue(issue_type, message, level="INFO"):
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S,%f")[:-3]
-    log_line = f"{timestamp} [{level}] [{issue_type}] {message}\n"
-    if _log_console:
-        print(log_line.strip())
+def log_issue(level, msg, **kwargs):
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    line = f"{timestamp} [{level}] {msg}"
+    if kwargs:
+        line += " " + str(kwargs)
+    print(line)
     rotate_log_if_needed()
-    try:
-        with open(LOG_FILE, 'a', encoding='utf-8') as f:
-            f.write(log_line)
-    except:
-        pass
+    with open(LOG_FILE, 'a', encoding='utf-8') as f:
+        f.write(line + "\n")
 
-def atomic_write(final_path, content):
-    dirname = os.path.dirname(final_path)
-    os.makedirs(dirname, exist_ok=True)
-    tmp_path = final_path + ".tmp"
-    try:
-        with open(tmp_path, 'w', encoding='utf-8') as f:
-            f.write(content)
-            f.flush()
-            os.fsync(f.fileno())
-        os.rename(tmp_path, final_path)
-        log_issue("ATOMIC", f"OK {os.path.basename(final_path)}", "INFO")
-    except Exception as e:
-        if os.path.exists(tmp_path):
-            os.remove(tmp_path)
-        log_issue("ATOMIC", f"FAIL {final_path}: {e}", "ERROR")
-        raise e
-
-# Cleanup orphaned .tmp files
-for tmp in glob.glob(os.path.join(SYMBOLS_DIR, "*_onchain.tmp")):
-    try:
-        os.remove(tmp)
-        log_issue("CLEANUP", f"Removed {os.path.basename(tmp)}", "INFO")
-    except:
-        pass
-
-# -------------------- STABLECOIN INFLOW (with cache) --------------------
+# ========== STABLECOIN INFLOW (cached) ==========
 def get_stablecoin_inflow():
     now = time.time()
     if _stable_cache["data"] is not None and (now - _stable_cache["timestamp"]) < _STABLE_TTL:
@@ -107,13 +84,17 @@ def get_stablecoin_inflow():
                 curr_circ = float(curr.get('totalCirculating', {}).get('peggedUSD', 0))
                 prev_circ = float(prev.get('totalCirculating', {}).get('peggedUSD', 0))
                 netflow = curr_circ - prev_circ
-                result.append({"symbol": "USDT", "circulating": curr_circ, "inflow_24h": netflow if netflow>0 else 0, "outflow_24h": -netflow if netflow<0 else 0, "netflow": netflow})
-                log_issue("DEFILLAMA", f"USDT: circ={curr_circ:.0f}, netflow={netflow:.0f}", "INFO")
-        else:
-            log_issue("DEFILLAMA", f"USDT HTTP {resp.status_code}", "WARNING")
+                result.append({
+                    "symbol": "USDT",
+                    "circulating": curr_circ,
+                    "inflow_24h": netflow if netflow > 0 else 0,
+                    "outflow_24h": -netflow if netflow < 0 else 0,
+                    "netflow": netflow
+                })
+                log_issue("INFO", f"USDT: circ={curr_circ:.0f}, netflow={netflow:.0f}")
     except Exception as e:
-        log_issue("DEFILLAMA", f"USDT error: {e}", "WARNING")
-    # USDC – DeFiLlama with CMC fallback
+        log_issue("WARNING", f"DeFiLlama USDT error: {e}")
+    # USDC
     try:
         url = "https://stablecoins.llama.fi/stablecoincharts/all?asset=2"
         resp = requests.get(url, timeout=15)
@@ -124,17 +105,19 @@ def get_stablecoin_inflow():
                 prev = data[-2]
                 curr_circ = float(curr.get('totalCirculating', {}).get('peggedUSD', 0))
                 if curr_circ > 200_000_000_000:
-                    log_issue("DEFILLAMA", f"USDC suspicious {curr_circ:.0f}, fallback to CMC", "WARNING")
                     raise ValueError("Suspicious USDC value")
                 prev_circ = float(prev.get('totalCirculating', {}).get('peggedUSD', 0))
                 netflow = curr_circ - prev_circ
-                result.append({"symbol": "USDC", "circulating": curr_circ, "inflow_24h": netflow if netflow>0 else 0, "outflow_24h": -netflow if netflow<0 else 0, "netflow": netflow})
-                log_issue("DEFILLAMA", f"USDC: circ={curr_circ:.0f}, netflow={netflow:.0f}", "INFO")
-            else:
-                raise ValueError("No data")
-        else:
-            raise ValueError("HTTP error")
+                result.append({
+                    "symbol": "USDC",
+                    "circulating": curr_circ,
+                    "inflow_24h": netflow if netflow > 0 else 0,
+                    "outflow_24h": -netflow if netflow < 0 else 0,
+                    "netflow": netflow
+                })
+                log_issue("INFO", f"USDC: circ={curr_circ:.0f}, netflow={netflow:.0f}")
     except Exception:
+        # Fallback to CMC
         try:
             headers = {'X-CMC_PRO_API_KEY': CMC_API_KEY}
             url = "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest"
@@ -144,17 +127,22 @@ def get_stablecoin_inflow():
                 data = resp.json()
                 if 'data' in data and 'USDC' in data['data']:
                     circ = float(data['data']['USDC']['quote']['USD']['circulating_supply'])
-                    result.append({"symbol": "USDC", "circulating": circ, "inflow_24h": 0, "outflow_24h": 0, "netflow": 0})
-                    log_issue("CMC", f"USDC fallback: circ={circ:.0f}", "INFO")
+                    result.append({
+                        "symbol": "USDC",
+                        "circulating": circ,
+                        "inflow_24h": 0,
+                        "outflow_24h": 0,
+                        "netflow": 0
+                    })
+                    log_issue("INFO", f"USDC fallback: circ={circ:.0f}")
         except Exception as e2:
-            log_issue("CMC", f"USDC error: {e2}", "WARNING")
+            log_issue("WARNING", f"USDC fallback error: {e2}")
     _stable_cache["data"] = result
     _stable_cache["timestamp"] = now
     return result
 
-# -------------------- BINANCE ENDPOINTS (parallel) --------------------
+# ========== BINANCE API FETCHERS ==========
 def fetch_binance_endpoint(symbol, endpoint, params=None):
-    """Generic fetch for Binance Futures endpoints."""
     url = f"{BINANCE_FUTURES_BASE}{endpoint}"
     if params is None:
         params = {}
@@ -164,15 +152,15 @@ def fetch_binance_endpoint(symbol, endpoint, params=None):
         if r.status_code == 200:
             return r.json()
         else:
-            log_issue("BINANCE_API", f"{endpoint} HTTP {r.status_code}", "WARNING")
+            log_issue("WARNING", f"Binance {endpoint} HTTP {r.status_code}")
     except Exception as e:
-        log_issue("BINANCE_API", f"{endpoint} error: {e}", "WARNING")
+        log_issue("WARNING", f"Binance {endpoint} error: {e}")
     return None
 
 def get_binance_liquidations(symbol):
     data = fetch_binance_endpoint(symbol, "/fapi/v1/allForceOrders", {"limit": 100})
+    events = []
     if data:
-        events = []
         for item in data:
             qty = float(item.get('origQty', 0))
             if qty > 5.0:
@@ -182,8 +170,7 @@ def get_binance_liquidations(symbol):
                     "quantity": qty,
                     "side": item.get('side', '')
                 })
-        return events[:20]
-    return []
+    return events[:20]
 
 def get_whale_ratio(symbol):
     data = fetch_binance_endpoint(symbol, "/futures/data/topLongShortPositionRatio", {"period": "5m", "limit": 1})
@@ -210,7 +197,6 @@ def get_open_interest(symbol):
     return 0.0
 
 def get_depth_imbalance(symbol, limit=100):
-    """Spot depth snapshot – imbalance over top 100 levels."""
     url = f"{BINANCE_SPOT_BASE}/depth"
     params = {"symbol": symbol.upper(), "limit": limit}
     try:
@@ -222,7 +208,7 @@ def get_depth_imbalance(symbol, limit=100):
             total = bid_vol + ask_vol
             return (bid_vol - ask_vol) / total if total > 0 else 0
     except Exception as e:
-        log_issue("DEPTH", f"Error: {e}", "WARNING")
+        log_issue("WARNING", f"Depth error: {e}")
     return 0.0
 
 def get_atr(symbol, period=14):
@@ -241,7 +227,7 @@ def get_atr(symbol, period=14):
                 atr_sum += tr
             return atr_sum / period
     except Exception as e:
-        log_issue("ATR", f"Error: {e}", "WARNING")
+        log_issue("WARNING", f"ATR error: {e}")
     return 0.0
 
 def get_current_price(symbol):
@@ -253,7 +239,7 @@ def get_current_price(symbol):
         pass
     return 0.0
 
-# -------------------- WHALE DETECTION (public APIs, fast) --------------------
+# ========== WHALE DETECTION (public APIs) ==========
 def get_dexscreener_whales(min_vol_usd=200_000):
     queries = ["USDT", "BTC", "ETH", "BNB", "SOL", "XRP", "DOGE", "MATIC"]
     whales = []
@@ -308,7 +294,7 @@ def get_blockchair_whales():
                 data = resp.json()
                 txs = data.get('data', {})
                 for tx_id, tx in list(txs.items())[:20]:
-                    value_usd = float(tx.get('output_value_usd',0))
+                    value_usd = float(tx.get('output_value_usd', 0))
                     if value_usd > 10000:
                         whales.append({
                             "timestamp": int(tx.get('time', time.time())) * 1000,
@@ -377,7 +363,7 @@ def get_etherscan_whales():
                 if data.get('status') == '1':
                     for tx in data.get('result', [])[:30]:
                         value = float(tx['value']) / 10**token['decimals']
-                        if value >= 2000:  # 2000 USDT/USDC
+                        if value >= 2000:
                             whales.append({
                                 "timestamp": int(tx['timeStamp']) * 1000,
                                 "text": f"Etherscan Whale: {value:,.0f} {token['symbol']}"
@@ -455,7 +441,7 @@ def get_blockchain_com_whales():
         pass
     return whales[:20]
 
-# -------------------- EXCHANGE NETFLOW (only BTC/ETH) --------------------
+# ========== EXCHANGE NETFLOW (BTC/ETH only) ==========
 def get_exchange_netflow(symbol):
     asset_map = {"BTCUSDT": "btc", "ETHUSDT": "eth"}
     asset = asset_map.get(symbol.upper())
@@ -478,84 +464,18 @@ def get_exchange_netflow(symbol):
                 outflow = float(item.get('FlowOutExUSD', 0))
                 netflows.append({"timestamp": ts_ms, "netflow": inflow - outflow})
             netflows.sort(key=lambda x: x['timestamp'], reverse=True)
-            if netflows:
-                return netflows[:120]
-    except:
-        pass
-    # CryptoQuant fallback
-    try:
-        asset_uc = asset.upper()
-        url = f"https://raw.githubusercontent.com/cryptoquant/data/master/exchange_flows/{asset_uc}_exchange_netflow_1h.csv"
-        resp = requests.get(url, timeout=10)
-        if resp.status_code == 200:
-            lines = resp.text.strip().splitlines()
-            netflows = []
-            for line in lines[1:]:
-                if not line.strip():
-                    continue
-                try:
-                    parts = line.split(',')
-                    if len(parts) >= 2:
-                        ts = int(parts[0])
-                        netflow = float(parts[1])
-                        netflows.append({"timestamp": ts, "netflow": netflow})
-                except:
-                    continue
-            netflows.sort(key=lambda x: x['timestamp'], reverse=True)
-            if netflows:
-                return netflows[:120]
+            return netflows[:120]
     except:
         pass
     return []
 
-# -------------------- PREDICTION LOGIC --------------------
-def compute_prediction(usdt_netflow, whale_ratio, taker_ratio, funding_rate, oi, depth_imbalance, stablecoin_bullish, liquidations):
-    score = 0
-    if usdt_netflow > 100_000_000:
-        score += 2
-    elif usdt_netflow < -100_000_000:
-        score -= 2
-    if whale_ratio > 1.2:
-        score += 2
-    elif whale_ratio < 0.8:
-        score -= 2
-    if taker_ratio > 1.2:
-        score += 2
-    elif taker_ratio < 0.8:
-        score -= 2
-    if funding_rate > 0.0001:
-        score -= 1
-    elif funding_rate < -0.0001:
-        score += 1
-    if depth_imbalance > 0.2:
-        score += 2
-    elif depth_imbalance < -0.2:
-        score -= 2
-    if stablecoin_bullish:
-        score += 1
-    else:
-        score -= 1
-    if liquidations and len(liquidations) > 5:
-        if score > 0:
-            score += 1
-        elif score < 0:
-            score -= 1
-    if score >= 3:
-        return "UP"
-    elif score <= -3:
-        return "DOWN"
-    else:
-        return "NEUTRAL"
-
-# -------------------- MAIN FUNCTION (parallel binance calls) --------------------
-def collect_and_save(symbol):
+# ========== MAIN DOWNLOADER ==========
+def run_download(symbol):
+    log_issue("INFO", f"Starting on‑chain raw download for {symbol}")
     start_time = time.time()
-    log_issue("COLLECT", f"Starting for {symbol} (optimized parallel)", "INFO")
 
     # 1. Stablecoin inflow (cached)
     stable = get_stablecoin_inflow()
-    usdt_netflow = next((s['netflow'] for s in stable if s['symbol'] == 'USDT'), 0)
-    stable_bullish = any(s['netflow'] > 0 for s in stable)
 
     # 2. Parallel fetch of Binance endpoints
     with ThreadPoolExecutor(max_workers=5) as executor:
@@ -575,8 +495,9 @@ def collect_and_save(symbol):
             try:
                 results[key] = future.result()
             except Exception as e:
-                log_issue("PARALLEL", f"{key} failed: {e}", "WARNING")
+                log_issue("WARNING", f"{key} fetch error: {e}")
                 results[key] = None if key != "price" else 0.0
+
     liquidations = results.get("liquidations", [])
     whale_ratio = results.get("whale_ratio", 0.0)
     taker_ratio = results.get("taker_ratio", 0.0)
@@ -586,13 +507,13 @@ def collect_and_save(symbol):
     atr = results.get("atr", 0.0)
     current_price = results.get("price", 0.0)
 
-    # 3. Exchange netflow (only for BTC/ETH)
+    # 3. Exchange netflow
     netflow = get_exchange_netflow(symbol)
 
-    # 4. Whale alerts (all public APIs – run in series but fast)
+    # 4. Whale alerts (all APIs)
     all_whales = []
-    all_whales.extend(get_dexscreener_whales(min_vol_usd=200_000))
-    all_whales.extend(get_binance_whale_trades(symbol, min_qty=1.0))
+    all_whales.extend(get_dexscreener_whales(200_000))
+    all_whales.extend(get_binance_whale_trades(symbol, 1.0))
     all_whales.extend(get_blockchair_whales())
     all_whales.extend(get_coinglass_whales())
     all_whales.extend(get_whale_alert())
@@ -600,80 +521,42 @@ def collect_and_save(symbol):
     all_whales.extend(get_bscscan_whales())
     all_whales.extend(get_mempool_whales())
     all_whales.extend(get_blockchain_com_whales())
-    all_whales = all_whales[:100]  # keep up to 100
+    all_whales = all_whales[:100]
 
-    # 5. Prediction
-    direction = compute_prediction(usdt_netflow, whale_ratio, taker_ratio, funding_rate, oi, depth_imbalance, stable_bullish, liquidations)
-    if current_price > 0 and atr > 0:
-        target = current_price + (atr * 0.8) if direction == "UP" else current_price - (atr * 0.8) if direction == "DOWN" else current_price
-    else:
-        target = current_price
-
+    # Write to .tmp_x TSV (overwrites each call)
     ts = int(time.time() * 1000)
+    tmp_x_path = os.path.join(SYMBOLS_DIR, f"{symbol.lower()}_onchain.tmp_x")
+    with open(tmp_x_path, "w", encoding="utf-8") as f:
+        # Header
+        f.write("type\ttimestamp\tfield1\tfield2\tfield3\tfield4\tfield5\n")
 
-    # Build TOON content
-    lines = []
-    lines.append(f"# On‑chain data for {symbol.upper()} – TOON format")
-    lines.append(f"generated: {datetime.now().isoformat()}")
-    lines.append(f"symbol: {symbol}")
-    lines.append("")
-    lines.append(f"next_1h_direction: {direction}")
-    lines.append(f"next_1h_target: {target:.2f}")
-    lines.append(f"current_price: {current_price:.2f}")
-    lines.append(f"atr_1h_14: {atr:.2f}")
-    lines.append(f"depth_imbalance: {depth_imbalance:.4f}")
-    lines.append(f"whale_ratio_5m: {whale_ratio:.2f}")
-    lines.append(f"taker_ratio_5m: {taker_ratio:.2f}")
-    lines.append(f"funding_rate: {funding_rate:.8f}")
-    lines.append(f"open_interest: {oi:.0f}")
-    lines.append("")
+        # Stablecoin snapshot (one row per stablecoin)
+        for s in stable:
+            f.write(f"stablecoin\t{ts}\t{s['symbol']}\t{s['circulating']:.0f}\t{s['inflow_24h']:.0f}\t{s['outflow_24h']:.0f}\t{s['netflow']:.0f}\n")
 
-    # Stablecoin array
-    fields = ["timestamp", "symbol", "circulating", "inflow_24h", "outflow_24h", "netflow_24h"]
-    rows = [f"{ts},{s['symbol']},{s['circulating']:.0f},{s['inflow_24h']:.0f},{s['outflow_24h']:.0f},{s['netflow']:.0f}" for s in stable]
-    if not rows:
-        rows = [f"{ts},NO_DATA,0,0,0,0"]
-    lines.append(f"stablecoin_netflow[{len(rows)}]{{{','.join(fields)}}}:")
-    lines.append("  " + " |\n  ".join(rows))
-    lines.append("")
+        # Binance metrics snapshot (single row)
+        f.write(f"binance_snapshot\t{ts}\t{current_price:.2f}\t{oi:.2f}\t{funding_rate:.8f}\t{whale_ratio:.4f}\t{taker_ratio:.4f}\t{depth_imbalance:.4f}\t{atr:.2f}\n")
 
-    # Whale transactions
-    fields2 = ["timestamp", "message"]
-    rows2 = [f"{w['timestamp']},{w['text']}" for w in all_whales]
-    if not rows2:
-        rows2 = [f"{ts},NO_WHALE_ACTIVITY"]
-    lines.append(f"whale_transactions[{len(rows2)}]{{{','.join(fields2)}}}:")
-    lines.append("  " + " |\n  ".join(rows2))
-    lines.append("")
+        # Whale events (one row per whale)
+        for w in all_whales:
+            f.write(f"whale\t{w['timestamp']}\t{w['text']}\t\t\t\t\n")
 
-    # Exchange netflow
-    fields3 = ["timestamp", "netflow_usd"]
-    if netflow:
-        rows3 = [f"{r['timestamp']},{r['netflow']:.2f}" for r in netflow]
-    else:
-        rows3 = [f"{ts},0"]
-    lines.append(f"exchange_netflow[{len(rows3)}]{{{','.join(fields3)}}}:")
-    lines.append("  " + " |\n  ".join(rows3))
-    lines.append("")
+        # Exchange netflow events (one row per netflow point)
+        for nf in netflow:
+            f.write(f"exchange_netflow\t{nf['timestamp']}\t{nf['netflow']:.2f}\t\t\t\t\n")
 
-    # Liquidations
-    fields4 = ["timestamp", "price", "quantity", "side"]
-    rows4 = [f"{liq['timestamp']},{liq['price']:.2f},{liq['quantity']:.2f},{liq['side']}" for liq in liquidations]
-    lines.append(f"binance_liquidations[{len(rows4)}]{{{','.join(fields4)}}}:")
-    lines.append("  " + (" |\n  ".join(rows4) if rows4 else " "))
-    lines.append("")
+        # Liquidation events
+        for liq in liquidations:
+            f.write(f"liquidation\t{liq['timestamp']}\t{liq['price']:.2f}\t{liq['quantity']:.2f}\t{liq['side']}\t\t\n")
 
-    lines.append("# ========== END OF TOON DATA ==========")
-
-    filepath = os.path.join(SYMBOLS_DIR, f"{symbol.lower()}_onchain.toon")
-    try:
-        atomic_write(filepath, "\n".join(lines) + "\n")
-        elapsed = time.time() - start_time
-        log_issue("SAVE_SUCCESS", f"{symbol}: {elapsed:.2f}s, whales:{len(all_whales)}", "INFO")
-    except Exception as e:
-        log_issue("SAVE_ERROR", f"{symbol}: {e}", "ERROR")
-        return False
+    log_issue("INFO", f"Raw on‑chain data saved to {tmp_x_path}")
+    elapsed = time.time() - start_time
+    log_issue("INFO", f"Download complete in {elapsed:.2f}s")
     return True
 
 if __name__ == "__main__":
-    collect_and_save("BTCUSDT")
+    if len(sys.argv) < 2:
+        print("Usage: python X23_onchain_rest.py SYMBOL")
+        sys.exit(1)
+    success = run_download(sys.argv[1].upper())
+    sys.exit(0 if success else 1)
