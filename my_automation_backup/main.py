@@ -1,16 +1,11 @@
-import sys, json, os, gc, time, sqlite3, traceback
+import sys, json, os, gc, time, traceback
 from flask import Flask, request, jsonify, render_template_string, send_file
 from sys_data import SysData
 from pairs import get_pairs_by_market
 from config import HTML_TEMPLATE, MARKET_TIMEFRAMES
+from go import generate_full_analysis   # NEW: import the full analysis generator
 
-# Import brain prediction module
-try:
-    from brain import predict as brain_predict
-    BRAIN_AVAILABLE = True
-except ImportError:
-    BRAIN_AVAILABLE = False
-    print("[Main] Brain module not found – AI predictions disabled")
+# No brain module import – removed as requested
 
 import logging
 log = logging.getLogger('werkzeug')
@@ -50,32 +45,33 @@ def _quality_badge(quality) -> str:
     return (f"<span style='font-size:9px;padding:1px 4px;border-radius:3px;"
             f"background:{c}22;border:1px solid {c}66;color:{c};'>{quality}</span>")
 
-# ---------- Helper: check if all X modules DB files exist ----------
+# ---------- LIGHT STATUS: Check all .tmp_p files (processing complete) ----------
 def _all_modules_complete(symbol: str) -> bool:
     clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
     base_dir = os.path.join(os.path.dirname(__file__), "market_data", "binance", "symbols")
-    
-    db_path = os.path.join(base_dir, f"{clean.lower()}.db")
-    if not os.path.exists(db_path):
-        return False
-    try:
-        conn = sqlite3.connect(db_path)
-        cur = conn.execute("SELECT COUNT(*) FROM candles_summary")
-        count = cur.fetchone()[0]
-        conn.close()
-        if count < 200:
+    required_tmp_p = [
+        f"{clean.lower()}.tmp_p",                     # P01
+        f"{clean.lower()}_cvd.tmp_p",                 # P02
+        f"{clean.lower()}_depth.tmp_p",               # P03
+        f"{clean.lower()}_derivative.tmp_p",          # P04
+        f"{clean.lower()}_correlation.tmp_p",         # P05
+        f"{clean.lower()}_macro.tmp_p",               # P06
+        f"{clean.lower()}_liquidations.tmp_p",        # P07
+        f"{clean.lower()}_sessions.tmp_p",            # P08
+        f"{clean.lower()}_sentiment.tmp_p",           # P09
+        f"{clean.lower()}_volProfile.tmp_p",          # P10
+        f"{clean.lower()}_mstructure.tmp_p",          # P11
+        f"{clean.lower()}_onchain.tmp_p",             # P12
+        f"{clean.lower()}_tick.tmp_p"                 # P13
+    ]
+    for fname in required_tmp_p:
+        path = os.path.join(base_dir, fname)
+        if not os.path.exists(path):
             return False
-    except:
-        return False
-    
-    vol_db = os.path.join(base_dir, f"{clean.lower()}_volProfile.db")
-    if not os.path.exists(vol_db):
-        return False
-    
     return True
 # ----------------------------------------------------------------
 
-# ── Routes ────────────────────────────────────────────────────────────────
+# ── Routes ─────────────────────────────────────────────────────
 @app.route('/')
 def index():
     try:
@@ -84,6 +80,13 @@ def index():
         return render_template_string(html)
     except Exception as e:
         return f"<p style='color:red'>Page error: {e}</p>", 500
+
+# NEW: Route that uses go.py to generate full analysis page
+@app.route('/go_analysis/<symbol>')
+def go_analysis(symbol):
+    """Generate full analysis page using go.py"""
+    symbol = symbol.upper().replace("/", "").replace(" (OTC)", "")
+    return generate_full_analysis(symbol)
 
 @app.route('/scan')
 def scan():
@@ -122,7 +125,7 @@ def scan():
             else:
                 status_icon = "🔴"
 
-            status_html = f"<span class='status-light' onclick='fillSymbol(\"{pair}\")' style='cursor:pointer; font-size:14px;' title='Click to fetch missing data'>{status_icon}</span>"
+            status_html = f"<span class='status-light' onclick='fillSymbol(\"{pair}\")' style='cursor:pointer; font-size:14px;' title='Click to fetch missing data (processing complete → 🟢)'>{status_icon}</span>"
             otc_badge = ""
             if src == "iqoption" or "(OTC)" in pair:
                 otc_badge = ("<span style='font-size:8px;color:#ffcc44;background:rgba(255,200,0,0.07);"
@@ -151,56 +154,13 @@ def scan():
   <td>{quality_badge}</td>
   <td style='font-size:9px;color:#555;max-width:120px;overflow:hidden;'>{reason}</td>
   <td class='feel-cell' style='min-width:100px;'>{feel_html}</td>
-  <td><button class='go-btn' onclick="doPredict('{market}','{pair}','{tf}', event)">→</button></td>
+  <td><button class='go-btn' onclick="doFullAnalysis('{pair}')">→</button></td>
 </tr>"""
-        # JavaScript for expandable row and prediction
+        # JavaScript: open new tab with go_analysis route
         js = """
 <script>
-function doPredict(market, pair, tf, event) {
-    let btn = event.target;
-    let row = btn.closest('tr');
-    // Remove existing expanded row if any
-    let nextRow = row.nextElementSibling;
-    if (nextRow && nextRow.classList && nextRow.classList.contains('expand-row')) {
-        nextRow.remove();
-        return;
-    }
-    // Create new row for expansion
-    let expandRow = document.createElement('tr');
-    expandRow.classList.add('expand-row');
-    let td = document.createElement('td');
-    td.colSpan = row.cells.length;
-    td.style.padding = '10px';
-    td.style.background = '#1a1a2e';
-    td.style.borderTop = '1px solid #333';
-    td.innerHTML = '<div class="prediction-loader">Loading prediction...</div>';
-    expandRow.appendChild(td);
-    row.insertAdjacentElement('afterend', expandRow);
-    // Fetch prediction
-    fetch(`/predict/${encodeURIComponent(pair)}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.error) {
-                td.innerHTML = `<div style="color:red;">Error: ${data.error}</div><button class="ok-btn" onclick="this.closest('.expand-row').remove()">Close</button>`;
-                return;
-            }
-            let html = `<div style="display:flex; justify-content:space-around; text-align:center; font-size:14px;">`;
-            for (let tf of ['30m', '45m', '1h']) {
-                let dir = data[tf].direction;
-                let conf = data[tf].confidence;
-                let color = dir === 'UP' ? '#00ff88' : (dir === 'DOWN' ? '#ff4444' : '#ffcc44');
-                html += `<div style="flex:1;">
-                            <div style="font-size:12px; color:#aaa;">${tf}</div>
-                            <div style="font-size:20px; font-weight:bold; color:${color};">${dir}</div>
-                            <div style="font-size:12px;">${conf}% conf</div>
-                         </div>`;
-            }
-            html += `</div><div style="text-align:center; margin-top:8px;"><button class="ok-btn" onclick="this.closest('.expand-row').remove()">Close</button></div>`;
-            td.innerHTML = html;
-        })
-        .catch(err => {
-            td.innerHTML = `<div style="color:red;">Error: ${err.message}</div><button class="ok-btn" onclick="this.closest('.expand-row').remove()">Close</button>`;
-        });
+function doFullAnalysis(pair) {
+    window.open('/go_analysis/' + encodeURIComponent(pair), '_blank');
 }
 </script>
 """
@@ -213,28 +173,15 @@ function doPredict(market, pair, tf, event) {
   <tbody>{rows_html}</tbody>
 </table>
 <div style='color:#444;font-size:10px;padding:6px 2px;'>
-  {len(pairs)} pairs · 65%+ strong · 40-65% mid · &lt;40% weak · auto-refresh 0.5s · 🟢 = all data ready · 🟡 = live candles (WS) but some modules missing · 🔴 = no live candles · Click 🔴/🟡 to fetch missing data · Drag ☰ to reorder rows
+  {len(pairs)} pairs · 65%+ strong · 40-65% mid · &lt;40% weak · auto-refresh 0.5s · 🟢 = all .tmp_p files ready (processing complete) · 🟡 = live candles but missing some processing · 🔴 = no live candles or no processing · Click 🔴/🟡 to fetch & process missing data · Drag ☰ to reorder rows
 </div>
 {js}"""
     except Exception as e:
         print(f"❌ [Main] Scan error: {e}")
         return f"<p class='err-msg'>Scan error: {e}</p>", 500
 
-@app.route('/predict/<symbol>')
-def predict_route(symbol):
-    """Return JSON prediction for the symbol using brain module."""
-    if not BRAIN_AVAILABLE:
-        return jsonify({"error": "Brain module not available"}), 500
-    try:
-        clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
-        pred = brain_predict(clean)
-        return jsonify(pred)
-    except Exception as e:
-        print(f"[Predict] Error for {symbol}: {e}")
-        traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
+# (Removed /predict route – brain module no longer exists)
 
-# Keep old /go route unchanged (for compatibility)
 @app.route('/go')
 def go():
     market = request.args.get('market', '')
@@ -282,7 +229,7 @@ def refresh():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# ==================== HEADER CALLS ROUTE ====================
+# ==================== HEADER CALLS ROUTE (unchanged) ====================
 @app.route('/calls')
 def calls():
     try:
@@ -318,7 +265,7 @@ def calls():
         <div style='color:#ccc; font-size:10px; padding:2px 6px;'>
             <table style='border-collapse:collapse; background:transparent; border-radius:4px; width:auto;'>
                 {rows_html}
-              </table>
+             </table>
         </div>
         """
         return html
@@ -364,203 +311,6 @@ def master():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 # ========================================================================
-
-@app.route('/check_file')
-def check_file():
-    symbol = request.args.get('symbol', '')
-    file_type = request.args.get('type', '')
-    if not symbol or not file_type:
-        return jsonify({"exists": False}), 400
-    clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
-    base_dir = os.path.join(os.path.dirname(__file__), "market_data", "binance", "symbols")
-    
-    if file_type == 'candles':
-        db_path = os.path.join(base_dir, f"{clean.lower()}.db")
-    elif file_type == 'volprofile':
-        db_path = os.path.join(base_dir, f"{clean.lower()}_volProfile.db")
-    elif file_type == 'depth':
-        db_path = os.path.join(base_dir, f"{clean.lower()}_depth.db")
-    else:
-        db_path = os.path.join(base_dir, f"{clean.lower()}_{file_type}.db")
-    
-    exists = os.path.exists(db_path)
-    modified = None
-    if exists:
-        modified = int(os.path.getmtime(db_path) * 1000)
-    return jsonify({"exists": exists, "modified": modified})
-
-@app.route('/data/<symbol>/<data_type>')
-def view_data(symbol, data_type):
-    clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
-    base_dir = os.path.join(os.path.dirname(__file__), "market_data", "binance", "symbols")
-    
-    if data_type == 'candles':
-        db_path = os.path.join(base_dir, f"{clean.lower()}.db")
-    elif data_type == 'volprofile':
-        db_path = os.path.join(base_dir, f"{clean.lower()}_volProfile.db")
-    elif data_type == 'depth':
-        db_path = os.path.join(base_dir, f"{clean.lower()}_depth.db")
-    elif data_type == 'derivative':
-        db_path = os.path.join(base_dir, f"{clean.lower()}_derivative.db")
-    elif data_type == 'liquidations':
-        db_path = os.path.join(base_dir, f"{clean.lower()}_liquidations.db")
-    elif data_type == 'mstructure':
-        db_path = os.path.join(base_dir, f"{clean.lower()}_mstructure.db")
-    else:
-        db_path = os.path.join(base_dir, f"{clean.lower()}_{data_type}.db")
-    
-    if not os.path.exists(db_path):
-        return f"File not found: {os.path.basename(db_path)}", 404
-    
-    try:
-        conn = sqlite3.connect(db_path)
-        conn.row_factory = sqlite3.Row
-        
-        if data_type == 'candles':
-            cur = conn.execute("SELECT * FROM candles_summary ORDER BY timeframe, timestamp_ms")
-            lines = [json.dumps(dict(row)) for row in cur]
-        elif data_type == 'volprofile':
-            lines = []
-            tables = [
-                'developing_poc', 'daily_profiles', 'untested_pocs', 'prediction_context',
-                'intraday_profiles', 'developing_vah_val', 'shape_interpretation', 'multi_tf_confluence'
-            ]
-            for table in tables:
-                try:
-                    cur = conn.execute(f"SELECT * FROM {table}")
-                    for row in cur:
-                        lines.append(json.dumps(dict(row)))
-                except sqlite3.OperationalError:
-                    pass
-            if not lines:
-                lines = ['{"info": "No volProfile data available"}']
-        elif data_type == 'depth':
-            lines = []
-            cur = conn.execute("SELECT * FROM depth_summary ORDER BY run_id DESC LIMIT 1")
-            for row in cur:
-                lines.append(json.dumps(dict(row)))
-            cur = conn.execute("SELECT side, target_pct, price FROM depth_tail_percentiles ORDER BY side, target_pct")
-            for row in cur:
-                lines.append(json.dumps(dict(row)))
-            cur = conn.execute("SELECT side, levels_json FROM depth_top")
-            for row in cur:
-                lines.append(json.dumps({"side": row['side'], "top25": json.loads(row['levels_json'])}))
-            cur = conn.execute("SELECT side, min_price, max_price, avg_price, total_volume, avg_volume, count, vwap, std_dev FROM depth_tail_stats")
-            for row in cur:
-                lines.append(json.dumps(dict(row)))
-            cur = conn.execute("SELECT * FROM meta")
-            for row in cur:
-                lines.append(json.dumps(dict(row)))
-            if not lines:
-                lines = ['{"info": "No depth data available"}']
-        elif data_type == 'derivative':
-            lines = []
-            cur = conn.execute("SELECT * FROM derivative_summary ORDER BY run_id DESC LIMIT 1")
-            for row in cur:
-                lines.append(json.dumps(dict(row)))
-            cur = conn.execute("SELECT timestamp, oi_value FROM derivative_oi_history ORDER BY timestamp")
-            for row in cur:
-                lines.append(json.dumps(dict(row)))
-            cur = conn.execute("SELECT timestamp, long_short_ratio, long_account, short_account FROM derivative_ls_history ORDER BY timestamp")
-            for row in cur:
-                lines.append(json.dumps(dict(row)))
-            cur = conn.execute("SELECT timestamp, funding_rate FROM derivative_funding_history ORDER BY timestamp")
-            for row in cur:
-                lines.append(json.dumps(dict(row)))
-            cur = conn.execute("SELECT price, volume FROM derivative_liquidation_levels ORDER BY seq")
-            for row in cur:
-                lines.append(json.dumps(dict(row)))
-            cur = conn.execute("SELECT * FROM meta")
-            for row in cur:
-                lines.append(json.dumps(dict(row)))
-            if not lines:
-                lines = ['{"info": "No derivative data available"}']
-        elif data_type == 'liquidations':
-            lines = []
-            cursor = conn.cursor()
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
-            tables = cursor.fetchall()
-            for table in tables:
-                table_name = table[0]
-                cur = conn.execute(f"SELECT * FROM {table_name}")
-                for row in cur:
-                    lines.append(json.dumps(dict(row)))
-            if not lines:
-                lines = ['{"info": "No liquidations data available"}']
-        elif data_type == 'mstructure':
-            lines = []
-            cursor = conn.cursor()
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
-            tables = cursor.fetchall()
-            for table in tables:
-                table_name = table[0]
-                cur = conn.execute(f"SELECT * FROM {table_name}")
-                for row in cur:
-                    lines.append(json.dumps(dict(row)))
-            if not lines:
-                lines = ['{"info": "No market structure data available"}']
-        else:
-            try:
-                cur = conn.execute("SELECT * FROM main")
-                lines = [json.dumps(dict(row)) for row in cur]
-            except sqlite3.OperationalError:
-                lines = []
-        
-        conn.close()
-        content = "\n".join(lines)
-        return content, 200, {'Content-Type': 'text/plain; charset=utf-8'}
-    except Exception as e:
-        print(f"[ERROR] /data/{symbol}/{data_type}: {e}")
-        import traceback
-        traceback.print_exc()
-        return f"Error reading DB: {e}", 500
-
-@app.route('/file_info')
-def file_info():
-    symbol = request.args.get('symbol', '')
-    if not symbol:
-        return jsonify({"error": "No symbol"}), 400
-    clean = symbol.upper().replace("/", "").replace(" (OTC)", "")
-    base_dir = os.path.join(os.path.dirname(__file__), "market_data", "binance", "symbols")
-    
-    def get_db_row_count(db_name, table='main'):
-        if db_name == 'candles':
-            db_path = os.path.join(base_dir, f"{clean.lower()}.db")
-        else:
-            db_path = os.path.join(base_dir, f"{clean.lower()}_{db_name}.db")
-        if not os.path.exists(db_path):
-            return 0
-        try:
-            conn = sqlite3.connect(db_path)
-            if db_name == 'candles':
-                cur = conn.execute("SELECT COUNT(*) FROM candles_summary")
-            elif db_name == 'volprofile':
-                cur = conn.execute("SELECT COUNT(*) FROM daily_profiles")
-            elif db_name == 'depth':
-                cur = conn.execute("SELECT COUNT(*) FROM depth_summary")
-            else:
-                cur = conn.execute(f"SELECT COUNT(*) FROM {table}")
-            count = cur.fetchone()[0]
-            conn.close()
-            return count
-        except:
-            return 0
-    
-    return jsonify({
-        "candles": get_db_row_count('candles'),
-        "volProfile": get_db_row_count('volprofile'),
-        "depth": get_db_row_count('depth'),
-        "cvd": get_db_row_count('cvd'),
-        "derivative": get_db_row_count('derivative'),
-        "correlation": get_db_row_count('correlation'),
-        "liquidations": get_db_row_count('liquidations'),
-        "macro": get_db_row_count('macro'),
-        "sessions": get_db_row_count('sessions'),
-        "sentiment": get_db_row_count('sentiment'),
-        "mstructure": get_db_row_count('mstructure'),
-        "onchain": get_db_row_count('onchain'),
-        "tick": get_db_row_count('tick')
-    })
 
 @app.route('/mem')
 def mem():
